@@ -155,9 +155,9 @@ class InventoryRecordResource extends Resource
 
                 Forms\Components\Section::make('Archivos Adjuntos')
                     ->schema([
-                        Forms\Components\SpatieMediaLibraryFileUpload::make('attachments')
+                        Forms\Components\FileUpload::make('attachments')
                             ->label('Documentos Digitalizados')
-                            ->collection('attachments')
+                            ->directory('inventory-records')
                             ->multiple()
                             ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png', 'image/gif'])
                             ->maxSize(10240)

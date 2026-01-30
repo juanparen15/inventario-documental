@@ -8,12 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Spatie\MediaLibrary\HasMedia;
-use Spatie\MediaLibrary\InteractsWithMedia;
 
-class InventoryRecord extends Model implements HasMedia
+class InventoryRecord extends Model
 {
-    use HasFactory, SoftDeletes, HasAuditLog, InteractsWithMedia;
+    use HasFactory, SoftDeletes, HasAuditLog;
 
     protected $fillable = [
         'organizational_unit_id',
@@ -37,6 +35,7 @@ class InventoryRecord extends Model implements HasMedia
         'project_id',
         'notes',
         'reference_code',
+        'attachments',
         'created_by',
         'updated_by',
     ];
@@ -45,6 +44,7 @@ class InventoryRecord extends Model implements HasMedia
         'start_date' => 'date',
         'end_date' => 'date',
         'folios' => 'integer',
+        'attachments' => 'array',
     ];
 
     protected static function boot(): void
@@ -73,12 +73,6 @@ class InventoryRecord extends Model implements HasMedia
         $seriesCode = $model->documentarySeries?->code ?? 'XX';
         $count = static::whereYear('created_at', $year)->count() + 1;
         return sprintf('%s-%s-%06d', $year, $seriesCode, $count);
-    }
-
-    public function registerMediaCollections(): void
-    {
-        $this->addMediaCollection('attachments')
-            ->acceptsMimeTypes(['application/pdf', 'image/jpeg', 'image/png', 'image/gif']);
     }
 
     // Relationships

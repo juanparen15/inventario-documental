@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan migrate:status:*)",
+      "Bash(php artisan db:seed:*)",
+      "Bash(php artisan migrate:fresh:*)",
+      "Bash(php artisan shield:generate:*)",
+      "Bash(php artisan shield:super-admin:*)",
+      "Bash(php artisan:*)",
+      "Bash(php artisan config:cache:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: Add explicit table names to models and generate Shield policies\n\n- Fixed table name issues for models with irregular plural forms\n- Added $table property to StorageMedium, DocumentarySeries, \n  DocumentarySubseries, ValidityStatus, DocumentaryClass models\n- Generated Shield policies for all resources\n- All migrations and seeders now work correctly\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(php:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: Replace Spatie Media Library with native FileUpload\n\n- Changed InventoryRecordResource to use Filament''s native FileUpload\n- Removed Spatie MediaLibrary dependency from InventoryRecord model\n- Added JSON attachments field to inventory_records table\n- Updated model casts and fillable properties\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  }
+}
