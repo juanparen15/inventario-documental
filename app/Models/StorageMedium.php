@@ -12,6 +12,8 @@ class StorageMedium extends Model
 {
     use HasFactory, SoftDeletes, HasAuditLog;
 
+    protected $table = 'storage_mediums';
+
     protected $fillable = [
         'name',
         'code',

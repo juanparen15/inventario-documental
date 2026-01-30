@@ -13,6 +13,8 @@ class DocumentaryClass extends Model
 {
     use HasFactory, SoftDeletes, HasAuditLog;
 
+    protected $table = 'documentary_classes';
+
     protected $fillable = [
         'code',
         'name',

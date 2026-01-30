@@ -12,6 +12,8 @@ class ValidityStatus extends Model
 {
     use HasFactory, SoftDeletes, HasAuditLog;
 
+    protected $table = 'validity_statuses';
+
     protected $fillable = [
         'name',
         'code',

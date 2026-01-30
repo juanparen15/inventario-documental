@@ -13,6 +13,8 @@ class DocumentarySubseries extends Model
 {
     use HasFactory, SoftDeletes, HasAuditLog;
 
+    protected $table = 'documentary_subseries';
+
     protected $fillable = [
         'code',
         'name',

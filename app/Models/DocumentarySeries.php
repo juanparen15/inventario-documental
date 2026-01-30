@@ -12,6 +12,8 @@ class DocumentarySeries extends Model
 {
     use HasFactory, SoftDeletes, HasAuditLog;
 
+    protected $table = 'documentary_series';
+
     protected $fillable = [
         'code',
         'name',
