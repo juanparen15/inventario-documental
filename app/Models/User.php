@@ -6,6 +6,7 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasAvatar;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -18,8 +19,13 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
 
     protected $fillable = [
         'name',
+        'last_name',
         'email',
+        'phone',
+        'document_number',
+        'organizational_unit_id',
         'password',
+        'avatar',
     ];
 
     protected $hidden = [
@@ -42,7 +48,25 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
 
     public function getFilamentAvatarUrl(): ?string
     {
-        return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=7F9CF5&background=EBF4FF';
+        if ($this->avatar && $this->avatar !== 'avatar.png') {
+            return asset('storage/avatars/' . $this->avatar);
+        }
+        return 'https://ui-avatars.com/api/?name=' . urlencode($this->full_name) . '&color=7F9CF5&background=EBF4FF';
+    }
+
+    public function getFullNameAttribute(): string
+    {
+        return trim($this->name . ' ' . $this->last_name);
+    }
+
+    public function organizationalUnit(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationalUnit::class);
+    }
+
+    public function administrativeActs(): HasMany
+    {
+        return $this->hasMany(AdministrativeAct::class);
     }
 
     public function inventoryRecordsCreated(): HasMany

@@ -3,9 +3,13 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\DocumentarySubseriesResource\Pages;
+use App\Models\CcdEntry;
+use App\Models\DocumentarySeries;
 use App\Models\DocumentarySubseries;
+use App\Models\OrganizationalUnit;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -18,7 +22,7 @@ class DocumentarySubseriesResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-folder-open';
 
-    protected static ?string $navigationGroup = 'Clasificación Documental';
+    protected static ?string $navigationGroup = 'Tabla de Retencion Documental';
 
     protected static ?string $modelLabel = 'Subserie Documental';
 
@@ -37,13 +41,19 @@ class DocumentarySubseriesResource extends Resource
                             ->relationship('documentarySeries', 'name')
                             ->required()
                             ->searchable()
-                            ->preload(),
+                            ->preload()
+                            ->live()
+                            ->afterStateUpdated(function ($state, Forms\Set $set) {
+                                if ($state) {
+                                    $series = DocumentarySeries::find($state);
+                                    $set('context', $series?->context ?? 'ccd');
+                                }
+                            }),
 
                         Forms\Components\TextInput::make('code')
-                            ->label('Código')
+                            ->label('Codigo')
                             ->required()
-                            ->maxLength(50)
-                            ->unique(ignoreRecord: true),
+                            ->maxLength(50),
 
                         Forms\Components\TextInput::make('name')
                             ->label('Nombre')
@@ -51,29 +61,44 @@ class DocumentarySubseriesResource extends Resource
                             ->maxLength(255),
 
                         Forms\Components\Textarea::make('description')
-                            ->label('Descripción')
+                            ->label('Descripcion')
                             ->rows(3)
                             ->columnSpanFull(),
-
-                        Forms\Components\TextInput::make('retention_years')
-                            ->label('Años de Retención')
-                            ->numeric()
-                            ->minValue(0),
-
-                        Forms\Components\Select::make('final_disposition')
-                            ->label('Disposición Final')
-                            ->options([
-                                'CT' => 'Conservación Total',
-                                'E' => 'Eliminación',
-                                'S' => 'Selección',
-                                'M' => 'Microfilmación',
-                            ]),
 
                         Forms\Components\Toggle::make('is_active')
                             ->label('Activo')
                             ->default(true),
+
+                        Forms\Components\Select::make('context')
+                            ->label('Contexto')
+                            ->options(DocumentarySubseries::CONTEXTS)
+                            ->disabled()
+                            ->dehydrated()
+                            ->default(fn(Get $get) => DocumentarySeries::find($get('documentary_series_id'))?->context ?? 'ccd')
+                            ->helperText('Heredado automaticamente de la serie padre.'),
                     ])
                     ->columns(2),
+
+                Forms\Components\Section::make('Unidades Organizacionales')
+                    ->description('Seleccione las unidades que tendran acceso a esta subserie')
+                    ->schema([
+                        Forms\Components\CheckboxList::make('organizational_units')
+                            ->label('')
+                            ->options(OrganizationalUnit::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
+                            ->columns(2)
+                            ->searchable()
+                            ->bulkToggleable()
+                            ->dehydrated(false)
+                            ->afterStateHydrated(function ($component, $record) {
+                                if ($record) {
+                                    $unitIds = CcdEntry::where('documentary_series_id', $record->documentary_series_id)
+                                        ->where('documentary_subseries_id', $record->id)
+                                        ->pluck('organizational_unit_id')
+                                        ->toArray();
+                                    $component->state($unitIds);
+                                }
+                            }),
+                    ]),
             ]);
     }
 
@@ -82,7 +107,7 @@ class DocumentarySubseriesResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('code')
-                    ->label('Código')
+                    ->label('Codigo')
                     ->searchable()
                     ->sortable(),
 
@@ -96,13 +121,20 @@ class DocumentarySubseriesResource extends Resource
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('retention_years')
-                    ->label('Años Retención')
+                Tables\Columns\TextColumn::make('context')
+                    ->label('Contexto')
+                    ->badge()
+                    ->formatStateUsing(fn(string $state): string => DocumentarySubseries::CONTEXTS[$state] ?? $state)
+                    ->color(fn(string $state): string => match ($state) {
+                        'fuid' => 'info',
+                        'ccd' => 'success',
+                        default => 'gray',
+                    })
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('documentary_classes_count')
-                    ->label('Clases')
-                    ->counts('documentaryClasses')
+                Tables\Columns\TextColumn::make('inventory_records_count')
+                    ->label('Registros')
+                    ->counts('inventoryRecords')
                     ->sortable(),
 
                 Tables\Columns\IconColumn::make('is_active')
@@ -117,6 +149,12 @@ class DocumentarySubseriesResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('context')
+                    ->label('Contexto')
+                    ->native(false)
+                    ->searchable()
+                    ->options(DocumentarySubseries::CONTEXTS),
+
                 Tables\Filters\SelectFilter::make('documentary_series_id')
                     ->label('Serie Documental')
                     ->relationship('documentarySeries', 'name')

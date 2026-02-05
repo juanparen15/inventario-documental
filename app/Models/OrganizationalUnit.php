@@ -52,4 +52,9 @@ class OrganizationalUnit extends Model
     {
         return $this->hasMany(InventoryRecord::class);
     }
+
+    public function administrativeActs(): HasMany
+    {
+        return $this->hasMany(AdministrativeAct::class);
+    }
 }

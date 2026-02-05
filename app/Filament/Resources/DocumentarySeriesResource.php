@@ -3,7 +3,9 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\DocumentarySeriesResource\Pages;
+use App\Models\CcdEntry;
 use App\Models\DocumentarySeries;
+use App\Models\OrganizationalUnit;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -18,7 +20,7 @@ class DocumentarySeriesResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-folder';
 
-    protected static ?string $navigationGroup = 'Clasificación Documental';
+    protected static ?string $navigationGroup = 'Tabla de Retencion Documental';
 
     protected static ?string $modelLabel = 'Serie Documental';
 
@@ -33,10 +35,9 @@ class DocumentarySeriesResource extends Resource
                 Forms\Components\Section::make()
                     ->schema([
                         Forms\Components\TextInput::make('code')
-                            ->label('Código')
+                            ->label('Codigo')
                             ->required()
-                            ->maxLength(50)
-                            ->unique(ignoreRecord: true),
+                            ->maxLength(50),
 
                         Forms\Components\TextInput::make('name')
                             ->label('Nombre')
@@ -44,29 +45,43 @@ class DocumentarySeriesResource extends Resource
                             ->maxLength(255),
 
                         Forms\Components\Textarea::make('description')
-                            ->label('Descripción')
+                            ->label('Descripcion')
                             ->rows(3)
                             ->columnSpanFull(),
 
-                        Forms\Components\TextInput::make('retention_years')
-                            ->label('Años de Retención')
-                            ->numeric()
-                            ->minValue(0),
-
-                        Forms\Components\Select::make('final_disposition')
-                            ->label('Disposición Final')
-                            ->options([
-                                'CT' => 'Conservación Total',
-                                'E' => 'Eliminación',
-                                'S' => 'Selección',
-                                'M' => 'Microfilmación',
-                            ]),
+                        Forms\Components\Select::make('context')
+                            ->label('Contexto')
+                            ->options(DocumentarySeries::CONTEXTS)
+                            ->required()
+                            ->default('ccd')
+                            ->helperText('FUID: Series del Inventario Documental. CCD: Series del Cuadro de Clasificacion Documental.'),
 
                         Forms\Components\Toggle::make('is_active')
                             ->label('Activo')
                             ->default(true),
                     ])
                     ->columns(2),
+
+                Forms\Components\Section::make('Unidades Organizacionales')
+                    ->description('Seleccione las unidades que tendran acceso a esta serie')
+                    ->schema([
+                        Forms\Components\CheckboxList::make('organizational_units')
+                            ->label('')
+                            ->options(OrganizationalUnit::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
+                            ->columns(2)
+                            ->searchable()
+                            ->bulkToggleable()
+                            ->dehydrated(false)
+                            ->afterStateHydrated(function ($component, $record) {
+                                if ($record) {
+                                    $unitIds = CcdEntry::where('documentary_series_id', $record->id)
+                                        ->distinct()
+                                        ->pluck('organizational_unit_id')
+                                        ->toArray();
+                                    $component->state($unitIds);
+                                }
+                            }),
+                    ]),
             ]);
     }
 
@@ -75,7 +90,7 @@ class DocumentarySeriesResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('code')
-                    ->label('Código')
+                    ->label('Codigo')
                     ->searchable()
                     ->sortable(),
 
@@ -84,20 +99,16 @@ class DocumentarySeriesResource extends Resource
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('retention_years')
-                    ->label('Años Retención')
-                    ->sortable(),
-
-                Tables\Columns\TextColumn::make('final_disposition')
-                    ->label('Disposición')
+                Tables\Columns\TextColumn::make('context')
+                    ->label('Contexto')
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'CT' => 'Conservación Total',
-                        'E' => 'Eliminación',
-                        'S' => 'Selección',
-                        'M' => 'Microfilmación',
-                        default => $state,
-                    }),
+                    ->formatStateUsing(fn(string $state): string => DocumentarySeries::CONTEXTS[$state] ?? $state)
+                    ->color(fn(string $state): string => match ($state) {
+                        'fuid' => 'info',
+                        'ccd' => 'success',
+                        default => 'gray',
+                    })
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('documentary_subseries_count')
                     ->label('Subseries')
@@ -116,16 +127,16 @@ class DocumentarySeriesResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('final_disposition')
-                    ->label('Disposición Final')
-                    ->options([
-                        'CT' => 'Conservación Total',
-                        'E' => 'Eliminación',
-                        'S' => 'Selección',
-                        'M' => 'Microfilmación',
-                    ]),
+                Tables\Filters\SelectFilter::make('context')
+                    ->label('Contexto')
+                    ->native(false)
+                    ->searchable()
+                    ->options(DocumentarySeries::CONTEXTS),
+
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Estado')
+                    ->native(false)
+                    ->searchable()
                     ->placeholder('Todos')
                     ->trueLabel('Activos')
                     ->falseLabel('Inactivos'),

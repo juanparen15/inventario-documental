@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
@@ -29,11 +30,16 @@ class UserResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make()
+                Forms\Components\Section::make('Información Personal')
+                    ->columns(2)
                     ->schema([
                         Forms\Components\TextInput::make('name')
                             ->label('Nombre')
                             ->required()
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('last_name')
+                            ->label('Apellido')
                             ->maxLength(255),
 
                         Forms\Components\TextInput::make('email')
@@ -43,6 +49,25 @@ class UserResource extends Resource
                             ->unique(ignoreRecord: true)
                             ->maxLength(255),
 
+                        Forms\Components\TextInput::make('phone')
+                            ->label('Teléfono')
+                            ->tel()
+                            ->maxLength(20),
+
+                        Forms\Components\TextInput::make('document_number')
+                            ->label('Documento de Identidad')
+                            ->maxLength(20),
+
+                        Forms\Components\Select::make('organizational_unit_id')
+                            ->label('Unidad Organizacional')
+                            ->relationship('organizationalUnit', 'name', fn (Builder $query) => $query->where('is_active', true))
+                            ->searchable()
+                            ->preload(),
+                    ]),
+
+                Forms\Components\Section::make('Credenciales de Acceso')
+                    ->columns(2)
+                    ->schema([
                         Forms\Components\TextInput::make('password')
                             ->label('Contraseña')
                             ->password()
@@ -63,9 +88,9 @@ class UserResource extends Resource
                             ->multiple()
                             ->relationship('roles', 'name')
                             ->preload()
-                            ->searchable(),
-                    ])
-                    ->columns(2),
+                            ->searchable()
+                            ->columnSpanFull(),
+                    ]),
             ]);
     }
 
@@ -76,12 +101,24 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nombre')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->description(fn ($record) => $record->last_name),
 
                 Tables\Columns\TextColumn::make('email')
                     ->label('Correo Electrónico')
                     ->searchable()
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('organizationalUnit.name')
+                    ->label('Unidad')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
+
+                Tables\Columns\TextColumn::make('phone')
+                    ->label('Teléfono')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('roles.name')
                     ->label('Roles')
@@ -93,18 +130,18 @@ class UserResource extends Resource
                     ->dateTime('d/m/Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->label('Actualizado')
-                    ->dateTime('d/m/Y H:i')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('roles')
                     ->label('Rol')
                     ->relationship('roles', 'name')
                     ->multiple()
+                    ->preload(),
+
+                Tables\Filters\SelectFilter::make('organizational_unit_id')
+                    ->label('Unidad Organizacional')
+                    ->relationship('organizationalUnit', 'name')
+                    ->searchable()
                     ->preload(),
             ])
             ->actions([
@@ -120,9 +157,7 @@ class UserResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array

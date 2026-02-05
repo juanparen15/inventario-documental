@@ -3,21 +3,25 @@
 namespace App\Filament\Widgets;
 
 use App\Models\DocumentarySeries;
-use App\Models\InventoryRecord;
 use Filament\Widgets\ChartWidget;
 
 class RecordsBySeriesChart extends ChartWidget
 {
-    protected static ?string $heading = 'Registros por Serie Documental';
+    protected static ?string $heading = 'FUID - Registros por Serie Documental';
 
     protected static ?int $sort = 2;
 
-    protected int | string | array $columnSpan = 'full';
+    protected int | string | array $columnSpan = [
+        'md' => 2,
+        'xl' => 2,
+    ];
+
+    protected static ?string $maxHeight = '350px';
 
     protected function getData(): array
     {
         $series = DocumentarySeries::withCount('inventoryRecords')
-            ->where('is_active', true)
+            ->has('inventoryRecords')
             ->orderByDesc('inventory_records_count')
             ->limit(10)
             ->get();
@@ -29,16 +33,19 @@ class RecordsBySeriesChart extends ChartWidget
                     'data' => $series->pluck('inventory_records_count')->toArray(),
                     'backgroundColor' => [
                         'rgba(59, 130, 246, 0.8)',
-                        'rgba(16, 185, 129, 0.8)',
-                        'rgba(245, 158, 11, 0.8)',
-                        'rgba(239, 68, 68, 0.8)',
-                        'rgba(139, 92, 246, 0.8)',
-                        'rgba(236, 72, 153, 0.8)',
-                        'rgba(20, 184, 166, 0.8)',
-                        'rgba(251, 146, 60, 0.8)',
-                        'rgba(99, 102, 241, 0.8)',
-                        'rgba(6, 182, 212, 0.8)',
+                        'rgba(37, 99, 235, 0.8)',
+                        'rgba(29, 78, 216, 0.8)',
+                        'rgba(96, 165, 250, 0.8)',
+                        'rgba(147, 197, 253, 0.8)',
+                        'rgba(30, 64, 175, 0.8)',
+                        'rgba(59, 130, 246, 0.6)',
+                        'rgba(37, 99, 235, 0.6)',
+                        'rgba(96, 165, 250, 0.6)',
+                        'rgba(29, 78, 216, 0.6)',
                     ],
+                    'hoverOffset' => 15,
+                    'hoverBorderColor' => 'rgba(59, 130, 246, 1)',
+                    'hoverBorderWidth' => 3,
                 ],
             ],
             'labels' => $series->pluck('name')->toArray(),

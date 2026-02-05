@@ -15,24 +15,23 @@ class InventoryRecord extends Model
 
     protected $fillable = [
         'organizational_unit_id',
+        'inventory_purpose',
         'documentary_series_id',
         'documentary_subseries_id',
-        'documentary_class_id',
-        'document_type_id',
         'title',
         'description',
         'start_date',
         'end_date',
+        'has_start_date',
+        'has_end_date',
         'box',
         'folder',
         'volume',
         'folios',
         'storage_medium_id',
-        'document_purpose_id',
-        'process_type_id',
-        'validity_status_id',
+        'storage_unit_type',
+        'storage_unit_quantity',
         'priority_level_id',
-        'project_id',
         'notes',
         'reference_code',
         'attachments',
@@ -40,10 +39,34 @@ class InventoryRecord extends Model
         'updated_by',
     ];
 
+    // Opciones de Objeto del Inventario (FUID)
+    public const INVENTORY_PURPOSES = [
+        'transferencias_primarias' => 'Transferencias Primarias',
+        'transferencias_secundarias' => 'Transferencias Secundarias',
+        'valoracion_fondos' => 'Valoracion de Fondos Acumulados',
+        'fusion_supresion' => 'Fusion y Supresion de Entidades y/o Dependencias',
+        'inventarios_individuales' => 'Inventarios Individuales',
+    ];
+
+    // Tipos de unidad de almacenamiento
+    public const STORAGE_UNIT_TYPES = [
+        'microfilm' => 'Rollo de Microfilm',
+        'casette' => 'Casette',
+        'cinta_video' => 'Cinta de Video',
+        'cd' => 'CD',
+        'dvd' => 'DVD',
+        'disco_duro' => 'Disco Duro',
+        'usb' => 'USB',
+        'otro' => 'Otro',
+    ];
+
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'has_start_date' => 'boolean',
+        'has_end_date' => 'boolean',
         'folios' => 'integer',
+        'storage_unit_quantity' => 'integer',
         'attachments' => 'array',
     ];
 
@@ -70,12 +93,12 @@ class InventoryRecord extends Model
     protected static function generateReferenceCode($model): string
     {
         $year = now()->format('Y');
-        $seriesCode = $model->documentarySeries?->code ?? 'XX';
+        $unitCode = $model->organizationalUnit?->code ?? 'XX';
         $count = static::whereYear('created_at', $year)->count() + 1;
-        return sprintf('%s-%s-%06d', $year, $seriesCode, $count);
+        return sprintf('%s-%s-%06d', $year, $unitCode, $count);
     }
 
-    // Relationships
+    // Relationships - TRD Structure
     public function organizationalUnit(): BelongsTo
     {
         return $this->belongsTo(OrganizationalUnit::class);
@@ -91,34 +114,10 @@ class InventoryRecord extends Model
         return $this->belongsTo(DocumentarySubseries::class);
     }
 
-    public function documentaryClass(): BelongsTo
-    {
-        return $this->belongsTo(DocumentaryClass::class);
-    }
-
-    public function documentType(): BelongsTo
-    {
-        return $this->belongsTo(DocumentType::class);
-    }
-
+    // Relationships - Auxiliary catalogs
     public function storageMedium(): BelongsTo
     {
         return $this->belongsTo(StorageMedium::class);
-    }
-
-    public function documentPurpose(): BelongsTo
-    {
-        return $this->belongsTo(DocumentPurpose::class);
-    }
-
-    public function processType(): BelongsTo
-    {
-        return $this->belongsTo(ProcessType::class);
-    }
-
-    public function validityStatus(): BelongsTo
-    {
-        return $this->belongsTo(ValidityStatus::class);
     }
 
     public function priorityLevel(): BelongsTo
@@ -126,11 +125,7 @@ class InventoryRecord extends Model
         return $this->belongsTo(PriorityLevel::class);
     }
 
-    public function project(): BelongsTo
-    {
-        return $this->belongsTo(Project::class);
-    }
-
+    // Audit relationships
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -149,8 +144,8 @@ class InventoryRecord extends Model
     // Accessors
     public function getDateRangeAttribute(): string
     {
-        $start = $this->start_date?->format('d/m/Y') ?? '-';
-        $end = $this->end_date?->format('d/m/Y') ?? '-';
+        $start = $this->has_start_date ? ($this->start_date?->format('d/m/Y') ?? '-') : 'S.F.';
+        $end = $this->has_end_date ? ($this->end_date?->format('d/m/Y') ?? '-') : 'S.F.';
         return "{$start} - {$end}";
     }
 

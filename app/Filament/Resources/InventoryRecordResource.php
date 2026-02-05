@@ -3,10 +3,11 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\InventoryRecordResource\Pages;
-use App\Models\DocumentaryClass;
+use App\Models\CcdEntry;
+use App\Models\DocumentarySeries;
 use App\Models\DocumentarySubseries;
-use App\Models\DocumentType;
 use App\Models\InventoryRecord;
+use App\Models\OrganizationalUnit;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -22,7 +23,7 @@ class InventoryRecordResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
 
-    protected static ?string $navigationGroup = 'Inventario';
+    protected static ?string $navigationGroup = 'Inventario Documental';
 
     protected static ?string $modelLabel = 'Registro de Inventario';
 
@@ -34,193 +35,323 @@ class InventoryRecordResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Clasificación Documental')
-                    ->description('Seleccione la clasificación del documento')
+                // SECCION 1: Identificacion del Registro
+                Forms\Components\Section::make('Identificacion del Registro')
+                    ->description('Formato Unico de Inventario Documental - FUID')
                     ->columns(2)
+                    ->extraAttributes(['data-tour' => 'inv-oficina-productora'])
                     ->schema([
                         Forms\Components\Select::make('organizational_unit_id')
-                            ->label('Unidad Organizacional')
-                            ->relationship('organizationalUnit', 'name')
+                            ->label('Oficina Productora')
+                            ->options(function () {
+                                $user = auth()->user();
+
+                                // Si es super_admin, puede ver todas las unidades
+                                if ($user?->hasRole('super_admin')) {
+                                    return OrganizationalUnit::where('is_active', true)
+                                        ->orderBy('name')
+                                        ->pluck('name', 'id');
+                                }
+
+                                // Si no, solo su unidad organizacional
+                                if ($user?->organizational_unit_id) {
+                                    return OrganizationalUnit::where('id', $user->organizational_unit_id)
+                                        ->pluck('name', 'id');
+                                }
+
+                                return OrganizationalUnit::where('is_active', true)
+                                    ->orderBy('name')
+                                    ->pluck('name', 'id');
+                            })
+                            ->default(fn() => auth()->user()?->organizational_unit_id)
                             ->searchable()
                             ->preload()
-                            ->required(),
+                            ->required()
+                            ->live()
+                            ->afterStateUpdated(function ($state, Forms\Set $set) {
+                                if ($state) {
+                                    $unit = OrganizationalUnit::find($state);
+                                    $set('unit_code_display', $unit?->code ?? 'N/A');
+                                }
+                                $set('documentary_series_id', null);
+                                $set('documentary_subseries_id', null);
+                            }),
 
+                        Forms\Components\TextInput::make('unit_code_display')
+                            ->label('Codigo Oficina')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->default(fn() => auth()->user()?->organizationalUnit?->code ?? 'N/A')
+                            ->afterStateHydrated(function ($component, $record) {
+                                if ($record?->organizational_unit_id) {
+                                    $unit = OrganizationalUnit::find($record->organizational_unit_id);
+                                    $component->state($unit?->code ?? 'N/A');
+                                }
+                            }),
+
+                        Forms\Components\Select::make('inventory_purpose')
+                            ->label('Objeto')
+                            ->searchable()
+                            ->native(false)
+                            ->options(InventoryRecord::INVENTORY_PURPOSES)
+                            ->required()
+                            ->columnSpanFull()
+                            ->extraAttributes(['data-tour' => 'inv-objeto'])
+                            ->helperText('Seleccione el proposito del inventario documental'),
+                    ]),
+
+                // SECCION 2: Clasificacion Documental (FUID)
+                Forms\Components\Section::make('Clasificacion Documental')
+                    ->description('Series y Subseries del Inventario Documental (FUID)')
+                    ->columns(2)
+                    ->collapsible()
+                    ->schema([
                         Forms\Components\Select::make('documentary_series_id')
                             ->label('Serie Documental')
-                            ->relationship('documentarySeries', 'name')
+                            ->options(function (Get $get, $state) {
+                                $unitId = $get('organizational_unit_id');
+                                if (!$unitId) {
+                                    return [];
+                                }
+
+                                $seriesIds = CcdEntry::where('organizational_unit_id', $unitId)
+                                    ->distinct()
+                                    ->pluck('documentary_series_id');
+
+                                return DocumentarySeries::where(function ($query) use ($seriesIds) {
+                                        $query->whereIn('id', $seriesIds)
+                                            ->where('is_active', true);
+                                    })
+                                    ->when($state, fn($query) => $query->orWhere('id', $state))
+                                    ->orderBy('code')
+                                    ->get()
+                                    ->mapWithKeys(fn($s) => [$s->id => "{$s->code} - {$s->name}"])
+                                    ->toArray();
+                            })
                             ->searchable()
                             ->preload()
                             ->live()
-                            ->afterStateUpdated(function (Forms\Set $set) {
-                                $set('documentary_subseries_id', null);
-                                $set('documentary_class_id', null);
-                                $set('document_type_id', null);
-                            })
-                            ->required(),
+                            ->afterStateUpdated(fn(Forms\Set $set) => $set('documentary_subseries_id', null))
+                            ->required()
+                            ->extraAttributes(['data-tour' => 'inv-serie']),
 
                         Forms\Components\Select::make('documentary_subseries_id')
                             ->label('Subserie Documental')
-                            ->options(function (Get $get) {
+                            ->required(function (Get $get) {
+                                $unitId = $get('organizational_unit_id');
                                 $seriesId = $get('documentary_series_id');
-                                if (!$seriesId) {
-                                    return [];
+                                if (!$unitId || !$seriesId) {
+                                    return false;
                                 }
-                                return DocumentarySubseries::where('documentary_series_id', $seriesId)
-                                    ->where('is_active', true)
-                                    ->pluck('name', 'id');
+                                return CcdEntry::where('organizational_unit_id', $unitId)
+                                    ->where('documentary_series_id', $seriesId)
+                                    ->whereNotNull('documentary_subseries_id')
+                                    ->exists();
                             })
-                            ->searchable()
-                            ->preload()
-                            ->live()
-                            ->afterStateUpdated(function (Forms\Set $set) {
-                                $set('documentary_class_id', null);
-                                $set('document_type_id', null);
-                            }),
-
-                        Forms\Components\Select::make('documentary_class_id')
-                            ->label('Clase Documental')
-                            ->options(function (Get $get) {
-                                $subseriesId = $get('documentary_subseries_id');
-                                if (!$subseriesId) {
+                            ->extraAttributes(['data-tour' => 'inv-subserie'])
+                            ->options(function (Get $get, $state) {
+                                $unitId = $get('organizational_unit_id');
+                                $seriesId = $get('documentary_series_id');
+                                if (!$unitId || !$seriesId) {
                                     return [];
                                 }
-                                return DocumentaryClass::where('documentary_subseries_id', $subseriesId)
-                                    ->where('is_active', true)
-                                    ->pluck('name', 'id');
-                            })
-                            ->searchable()
-                            ->preload()
-                            ->live()
-                            ->afterStateUpdated(fn (Forms\Set $set) => $set('document_type_id', null)),
 
-                        Forms\Components\Select::make('document_type_id')
-                            ->label('Tipo de Documento')
-                            ->options(function (Get $get) {
-                                $classId = $get('documentary_class_id');
-                                if (!$classId) {
+                                $subseriesIds = CcdEntry::where('organizational_unit_id', $unitId)
+                                    ->where('documentary_series_id', $seriesId)
+                                    ->whereNotNull('documentary_subseries_id')
+                                    ->pluck('documentary_subseries_id');
+
+                                if ($subseriesIds->isEmpty() && !$state) {
                                     return [];
                                 }
-                                return DocumentType::where('documentary_class_id', $classId)
-                                    ->where('is_active', true)
-                                    ->pluck('name', 'id');
+
+                                return DocumentarySubseries::where(function ($query) use ($subseriesIds) {
+                                        $query->whereIn('id', $subseriesIds)
+                                            ->where('is_active', true);
+                                    })
+                                    ->when($state, fn($query) => $query->orWhere('id', $state))
+                                    ->orderBy('code')
+                                    ->get()
+                                    ->mapWithKeys(fn($s) => [$s->id => "{$s->code} - {$s->name}"])
+                                    ->toArray();
                             })
                             ->searchable()
                             ->preload(),
                     ]),
 
-                Forms\Components\Section::make('Información del Documento')
+                // SECCION 3: Descripcion de la Unidad Documental
+                Forms\Components\Section::make('Descripcion de la Unidad Documental')
                     ->columns(2)
+                    ->collapsible()
                     ->schema([
                         Forms\Components\TextInput::make('title')
-                            ->label('Título')
-                            ->required()
+                            ->label('Nombre de la Unidad Documental')
+                            ->helperText('Nombre con el cual se identifica la unidad documental (opcional)')
                             ->maxLength(255)
+                            ->extraInputAttributes(['data-tour' => 'inv-titulo'])
                             ->columnSpanFull(),
 
                         Forms\Components\Textarea::make('description')
-                            ->label('Descripción')
-                            ->rows(3)
-                            ->columnSpanFull(),
-
-                        Forms\Components\DatePicker::make('start_date')
-                            ->label('Fecha Inicial')
-                            ->displayFormat('d/m/Y'),
-
-                        Forms\Components\DatePicker::make('end_date')
-                            ->label('Fecha Final')
-                            ->displayFormat('d/m/Y')
-                            ->afterOrEqual('start_date'),
-                    ]),
-
-                Forms\Components\Section::make('Ubicación Física')
-                    ->columns(4)
-                    ->schema([
-                        Forms\Components\TextInput::make('box')
-                            ->label('Caja')
-                            ->maxLength(50),
-
-                        Forms\Components\TextInput::make('folder')
-                            ->label('Carpeta')
-                            ->maxLength(50),
-
-                        Forms\Components\TextInput::make('volume')
-                            ->label('Tomo')
-                            ->maxLength(50),
-
-                        Forms\Components\TextInput::make('folios')
-                            ->label('Folios')
-                            ->numeric()
-                            ->minValue(0),
-                    ]),
-
-                Forms\Components\Section::make('Archivos Adjuntos')
-                    ->schema([
-                        Forms\Components\FileUpload::make('attachments')
-                            ->label('Documentos Digitalizados')
-                            ->directory('inventory-records')
-                            ->multiple()
-                            ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png', 'image/gif'])
-                            ->maxSize(10240)
-                            ->downloadable()
-                            ->openable()
-                            ->reorderable()
-                            ->columnSpanFull(),
-                    ]),
-
-                Forms\Components\Section::make('Catálogos')
-                    ->columns(3)
-                    ->collapsible()
-                    ->collapsed()
-                    ->schema([
-                        Forms\Components\Select::make('storage_medium_id')
-                            ->label('Soporte')
-                            ->relationship('storageMedium', 'name', fn (Builder $query) => $query->where('is_active', true))
-                            ->searchable()
-                            ->preload(),
-
-                        Forms\Components\Select::make('document_purpose_id')
-                            ->label('Objeto')
-                            ->relationship('documentPurpose', 'name', fn (Builder $query) => $query->where('is_active', true))
-                            ->searchable()
-                            ->preload(),
-
-                        Forms\Components\Select::make('process_type_id')
-                            ->label('Tipo de Proceso')
-                            ->relationship('processType', 'name', fn (Builder $query) => $query->where('is_active', true))
-                            ->searchable()
-                            ->preload(),
-
-                        Forms\Components\Select::make('validity_status_id')
-                            ->label('Estado de Vigencia')
-                            ->relationship('validityStatus', 'name', fn (Builder $query) => $query->where('is_active', true))
-                            ->searchable()
-                            ->preload(),
-
-                        Forms\Components\Select::make('priority_level_id')
-                            ->label('Nivel de Prioridad')
-                            ->relationship('priorityLevel', 'name', fn (Builder $query) => $query->where('is_active', true))
-                            ->searchable()
-                            ->preload(),
-
-                        Forms\Components\Select::make('project_id')
-                            ->label('Proyecto')
-                            ->relationship('project', 'name', fn (Builder $query) => $query->where('is_active', true))
-                            ->searchable()
-                            ->preload(),
-                    ]),
-
-                Forms\Components\Section::make('Notas')
-                    ->schema([
-                        Forms\Components\Textarea::make('notes')
-                            ->label('Notas Adicionales')
+                            ->label('Descripcion')
                             ->rows(2)
                             ->columnSpanFull(),
                     ]),
 
-                Forms\Components\Section::make('Información del Sistema')
+                // SECCION 4: Fechas Extremas
+                Forms\Components\Section::make('Fechas Extremas')
+                    ->description('Fechas del documento principal (no anexos). Use "Sin Fecha" si no aplica.')
+                    ->columns(4)
+                    ->collapsible()
+                    ->extraAttributes(['data-tour' => 'inv-fechas'])
+                    ->schema([
+                        Forms\Components\Toggle::make('has_start_date')
+                            ->label('Tiene fecha inicial')
+                            ->default(true)
+                            ->live()
+                            ->inline(false),
+
+                        Forms\Components\DatePicker::make('start_date')
+                            ->label('Fecha Inicial')
+                            ->displayFormat('Y-m-d')
+                            ->required()
+                            ->visible(fn(Get $get) => $get('has_start_date'))
+                            ->helperText('Formato: DD-MM-AAAA'),
+
+                        Forms\Components\Toggle::make('has_end_date')
+                            ->label('Tiene fecha final')
+                            ->default(true)
+                            ->required()
+                            ->live()
+                            ->inline(false),
+
+                        Forms\Components\DatePicker::make('end_date')
+                            ->label('Fecha Final')
+                            ->displayFormat('Y-m-d')
+                            ->visible(fn(Get $get) => $get('has_end_date'))
+                            ->afterOrEqual('start_date')
+                            ->helperText('Formato: DD-MM-AAAA'),
+
+                        Forms\Components\Placeholder::make('sin_fecha_inicial')
+                            ->label('Fecha Inicial')
+                            ->content('S.F. (Sin Fecha)')
+                            ->visible(fn(Get $get) => !$get('has_start_date')),
+
+                        Forms\Components\Placeholder::make('sin_fecha_final')
+                            ->label('Fecha Final')
+                            ->content('S.F. (Sin Fecha)')
+                            ->visible(fn(Get $get) => !$get('has_end_date')),
+                    ]),
+
+                // SECCION 5: Ubicacion Fisica
+                Forms\Components\Section::make('Ubicacion Fisica')
+                    ->columns(4)
+                    ->collapsible()
+                    ->extraAttributes(['data-tour' => 'inv-ubicacion'])
+                    ->schema([
+                        Forms\Components\TextInput::make('box')
+                            ->label('No. Caja')
+                            ->helperText('Numero consecutivo de caja')
+                            ->required()
+                            ->numeric()
+                            ->maxLength(50),
+
+                        Forms\Components\TextInput::make('folder')
+                            ->label('No. Carpeta')
+                            ->helperText('Consecutivo iniciando en 1 por caja')
+                            ->required()
+                            ->numeric()
+                            ->maxLength(50),
+
+                        Forms\Components\TextInput::make('volume')
+                            ->label('No. Tomo/Legajo/Libro')
+                            ->helperText('Si aplica material empastado')
+                            ->required()
+                            ->numeric()
+                            ->maxLength(50),
+
+                        Forms\Components\TextInput::make('folios')
+                            ->label('No. Folios')
+                            ->helperText('Rango de folios en papel')
+                            ->required()
+                            ->numeric()
+                            ->minValue(0),
+                    ]),
+
+                // SECCION 6: Soporte
+                Forms\Components\Section::make('Soporte')
+                    ->columns(3)
+                    ->collapsible()
+                    ->extraAttributes(['data-tour' => 'inv-soporte'])
+                    ->schema([
+                        Forms\Components\Select::make('storage_medium_id')
+                            ->label('Soporte Fisico/Electronico')
+                            ->relationship('storageMedium', 'name', fn(Builder $query) => $query->where('is_active', true))
+                            ->searchable()
+                            ->preload()
+                            ->helperText('Papel, electronico o ambos'),
+
+                        Forms\Components\Select::make('storage_unit_type')
+                            ->label('Tipo Unidad de Almacenamiento')
+                            ->options(InventoryRecord::STORAGE_UNIT_TYPES)
+                            ->searchable()
+                            ->native(false)
+                            ->live()
+                            ->helperText('Microfilm, casette, CD, DVD, etc.'),
+
+                        Forms\Components\TextInput::make('storage_unit_quantity')
+                            ->label('Cantidad Unidades')
+                            ->numeric()
+                            ->minValue(1)
+                            ->visible(fn(Get $get) => !empty($get('storage_unit_type')))
+                            ->helperText('Cantidad de unidades de almacenamiento'),
+                    ]),
+
+                // SECCION 7: Archivos Adjuntos
+                Forms\Components\Section::make('Archivo Digitalizado')
+                    ->extraAttributes(['data-tour' => 'inv-adjuntos'])
+                    ->schema([
+                        Forms\Components\FileUpload::make('attachments')
+                            ->label('Documentos PDF')
+                            ->directory('inventory-records')
+                            ->multiple()
+                            ->acceptedFileTypes(['application/pdf'])
+                            ->maxSize(20480) // 20MB
+                            ->downloadable()
+                            ->openable()
+                            ->reorderable()
+                            ->helperText('Solo archivos PDF. Maximo 20MB por archivo.')
+                            ->columnSpanFull(),
+                    ]),
+
+                // SECCION 8: Informacion Adicional
+                Forms\Components\Section::make('Informacion Adicional')
+                    ->collapsible()
+                    ->collapsed()
+                    ->schema([
+                        Forms\Components\Select::make('priority_level_id')
+                            ->label('Nivel de Prioridad')
+                            ->relationship('priorityLevel', 'name', fn(Builder $query) => $query->where('is_active', true))
+                            ->searchable()
+                            ->preload(),
+                    ]),
+
+                // SECCION 9: Notas
+                Forms\Components\Section::make('Notas')
+                    ->description('Informacion relevante no registrada en otros campos')
+                    ->collapsible()
+                    ->schema([
+                        Forms\Components\Textarea::make('notes')
+                            ->label('Notas')
+                            ->rows(4)
+                            ->helperText('Registrar: faltantes, errores de numeracion, estado de conservacion (deterioro fisico, quimico, biologico), documentos relativos a DDHH y DIH, o NA (No Aplica)')
+                            ->columnSpanFull(),
+                    ]),
+
+                // SECCION 10: Informacion del Sistema (solo en edicion)
+                Forms\Components\Section::make('Informacion del Sistema')
                     ->schema([
                         Forms\Components\TextInput::make('reference_code')
-                            ->label('Código de Referencia')
+                            ->label('Codigo de Referencia')
                             ->disabled()
                             ->dehydrated(false),
                     ])
@@ -231,30 +362,44 @@ class InventoryRecordResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultPaginationPageOption(5)
+            ->deferLoading()
             ->columns([
                 Tables\Columns\TextColumn::make('reference_code')
-                    ->label('Código')
+                    ->label('Codigo')
                     ->searchable()
                     ->sortable()
                     ->copyable(),
 
                 Tables\Columns\TextColumn::make('title')
-                    ->label('Título')
+                    ->label('Unidad Documental')
                     ->searchable()
-                    ->limit(40)
-                    ->tooltip(fn ($record) => $record->title),
+                    ->limit(30)
+                    ->tooltip(fn($record) => $record->title),
 
                 Tables\Columns\TextColumn::make('organizationalUnit.name')
-                    ->label('Unidad')
+                    ->label('Oficina Productora')
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
+
+                Tables\Columns\TextColumn::make('inventory_purpose')
+                    ->label('Objeto')
+                    ->badge()
+                    ->formatStateUsing(fn($state) => InventoryRecord::INVENTORY_PURPOSES[$state] ?? $state)
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('documentarySeries.name')
                     ->label('Serie')
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
+
+                Tables\Columns\TextColumn::make('documentarySubseries.name')
+                    ->label('Subserie')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('box')
                     ->label('Caja')
@@ -267,14 +412,14 @@ class InventoryRecordResource extends Resource
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('start_date')
-                    ->label('Fecha Inicio')
-                    ->date('d/m/Y')
+                    ->label('Fecha Inicial')
+                    ->formatStateUsing(fn($state, $record) => $record->has_start_date ? ($state?->format('Y-m-d') ?? '-') : 'S.F.')
                     ->sortable()
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('end_date')
-                    ->label('Fecha Fin')
-                    ->date('d/m/Y')
+                    ->label('Fecha Final')
+                    ->formatStateUsing(fn($state, $record) => $record->has_end_date ? ($state?->format('Y-m-d') ?? '-') : 'S.F.')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
@@ -294,24 +439,29 @@ class InventoryRecordResource extends Resource
                     ->dateTime('d/m/Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->label('Actualizado')
-                    ->dateTime('d/m/Y H:i')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('organizational_unit_id')
-                    ->label('Unidad Organizacional')
+                    ->label('Oficina Productora')
                     ->relationship('organizationalUnit', 'name')
                     ->searchable()
                     ->preload()
                     ->multiple(),
 
+                Tables\Filters\SelectFilter::make('inventory_purpose')
+                    ->label('Objeto')
+                    ->options(InventoryRecord::INVENTORY_PURPOSES),
+
                 Tables\Filters\SelectFilter::make('documentary_series_id')
                     ->label('Serie Documental')
                     ->relationship('documentarySeries', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->multiple(),
+
+                Tables\Filters\SelectFilter::make('documentary_subseries_id')
+                    ->label('Subserie Documental')
+                    ->relationship('documentarySubseries', 'name')
                     ->searchable()
                     ->preload()
                     ->multiple(),
@@ -327,23 +477,17 @@ class InventoryRecordResource extends Resource
                         return $query
                             ->when(
                                 $data['from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('start_date', '>=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('start_date', '>=', $date),
                             )
                             ->when(
                                 $data['until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('end_date', '<=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('end_date', '<=', $date),
                             );
                     }),
 
                 Tables\Filters\SelectFilter::make('storage_medium_id')
                     ->label('Soporte')
                     ->relationship('storageMedium', 'name')
-                    ->searchable()
-                    ->preload(),
-
-                Tables\Filters\SelectFilter::make('project_id')
-                    ->label('Proyecto')
-                    ->relationship('project', 'name')
                     ->searchable()
                     ->preload(),
 
@@ -363,7 +507,7 @@ class InventoryRecordResource extends Resource
                     })
                     ->requiresConfirmation()
                     ->modalHeading('Duplicar Registro')
-                    ->modalDescription('Se creará una copia de este registro. El código de referencia será generado automáticamente.'),
+                    ->modalDescription('Se creara una copia de este registro. El codigo de referencia sera generado automaticamente.'),
                 Tables\Actions\DeleteAction::make(),
                 Tables\Actions\ForceDeleteAction::make(),
                 Tables\Actions\RestoreAction::make(),
@@ -397,10 +541,18 @@ class InventoryRecordResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
+        // Si no es super_admin, solo ver registros de su unidad organizacional
+        $user = auth()->user();
+        if ($user && !$user->hasRole('super_admin') && $user->organizational_unit_id) {
+            $query->where('organizational_unit_id', $user->organizational_unit_id);
+        }
+
+        return $query;
     }
 
     public static function getGloballySearchableAttributes(): array

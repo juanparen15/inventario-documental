@@ -14,6 +14,11 @@ class DocumentarySeries extends Model
 
     protected $table = 'documentary_series';
 
+    public const CONTEXTS = [
+        'fuid' => 'FUID (Inventario Documental)',
+        'ccd' => 'CCD (Cuadro de Clasificacion)',
+    ];
+
     protected $fillable = [
         'code',
         'name',
@@ -21,12 +26,34 @@ class DocumentarySeries extends Model
         'retention_years',
         'final_disposition',
         'is_active',
+        'context',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'retention_years' => 'integer',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::updating(function (self $series) {
+            if ($series->isDirty('context')) {
+                $series->documentarySubseries()->update(['context' => $series->context]);
+            }
+        });
+    }
+
+    public function scopeFuid($query)
+    {
+        return $query->where('context', 'fuid');
+    }
+
+    public function scopeCcd($query)
+    {
+        return $query->where('context', 'ccd');
+    }
 
     public function documentarySubseries(): HasMany
     {

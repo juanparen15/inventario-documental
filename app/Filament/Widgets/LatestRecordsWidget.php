@@ -9,27 +9,35 @@ use Filament\Widgets\TableWidget as BaseWidget;
 
 class LatestRecordsWidget extends BaseWidget
 {
-    protected static ?string $heading = 'Últimos Registros';
+    protected static ?string $heading = 'Ultimos Registros FUID';
 
-    protected static ?int $sort = 4;
+    protected static ?int $sort = 6;
+
+    // protected int | string | array $columnSpan = [
+    //     'md' => 2,
+    //     'xl' => 2,
+    // ];
 
     protected int | string | array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
+        $query = InventoryRecord::query()->latest()->limit(5);
+
+        $user = auth()->user();
+        if ($user && !$user->hasRole('super_admin') && $user->organizational_unit_id) {
+            $query->where('organizational_unit_id', $user->organizational_unit_id);
+        }
+
         return $table
-            ->query(
-                InventoryRecord::query()
-                    ->latest()
-                    ->limit(5)
-            )
+            ->query($query)
             ->columns([
                 Tables\Columns\TextColumn::make('reference_code')
-                    ->label('Código')
+                    ->label('Codigo')
                     ->searchable(),
 
                 Tables\Columns\TextColumn::make('title')
-                    ->label('Título')
+                    ->label('Unidad Documental')
                     ->limit(40),
 
                 Tables\Columns\TextColumn::make('organizationalUnit.name')
@@ -46,7 +54,7 @@ class LatestRecordsWidget extends BaseWidget
             ->actions([
                 Tables\Actions\Action::make('view')
                     ->label('Ver')
-                    ->url(fn (InventoryRecord $record): string => route('filament.admin.resources.inventory-records.edit', $record))
+                    ->url(fn(InventoryRecord $record): string => route('filament.admin.resources.inventory-records.edit', $record))
                     ->icon('heroicon-o-eye'),
             ])
             ->paginated(false);
