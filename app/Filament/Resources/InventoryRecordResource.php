@@ -431,6 +431,7 @@ class InventoryRecordResource extends Resource
 
                 Tables\Columns\TextColumn::make('attachments')
                     ->label('Archivos PDF')
+                    ->sortable()
                     ->formatStateUsing(function ($state) {
                         if (empty($state)) {
                             return '-';
