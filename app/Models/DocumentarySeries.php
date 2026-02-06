@@ -65,6 +65,11 @@ class DocumentarySeries extends Model
         return $this->hasMany(InventoryRecord::class);
     }
 
+    public function administrativeActs(): HasMany
+    {
+        return $this->hasMany(AdministrativeAct::class);
+    }
+
     public function getFullNameAttribute(): string
     {
         return "{$this->code} - {$this->name}";

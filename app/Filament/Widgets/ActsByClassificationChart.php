@@ -2,18 +2,18 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\ActClassification;
+use App\Models\DocumentarySeries;
 use Filament\Widgets\ChartWidget;
 
 class ActsByClassificationChart extends ChartWidget
 {
-    protected static ?string $heading = 'CCD - Actos por Clasificacion';
+    protected static ?string $heading = 'CCD - Actos por Serie Documental';
 
     protected static ?int $sort = 3;
 
     protected int | string | array $columnSpan = [
         'md' => 2,
-        'xl' => 1,
+        'xl' => 2,
     ];
 
     protected static ?string $maxHeight = '350px';
@@ -24,7 +24,9 @@ class ActsByClassificationChart extends ChartWidget
         $isSuperAdmin = $user?->hasRole('super_admin');
         $unitId = $user?->organizational_unit_id;
 
-        $query = ActClassification::query()->where('is_active', true);
+        $query = DocumentarySeries::query()
+            ->where('is_active', true)
+            ->where('context', 'ccd');
 
         if (!$isSuperAdmin && $unitId) {
             $query->withCount(['administrativeActs' => function ($q) use ($unitId) {
@@ -34,32 +36,41 @@ class ActsByClassificationChart extends ChartWidget
             $query->withCount('administrativeActs');
         }
 
-        $classifications = $query->orderByDesc('administrative_acts_count')->get();
+        $series = $query
+            ->having('administrative_acts_count', '>', 0)
+            ->orderByDesc('administrative_acts_count')
+            ->limit(10)
+            ->get();
 
         return [
             'datasets' => [
                 [
                     'label' => 'Actos',
-                    'data' => $classifications->pluck('administrative_acts_count')->toArray(),
+                    'data' => $series->pluck('administrative_acts_count')->toArray(),
                     'backgroundColor' => [
                         'rgba(16, 185, 129, 0.8)',
                         'rgba(5, 150, 105, 0.8)',
                         'rgba(4, 120, 87, 0.8)',
                         'rgba(52, 211, 153, 0.8)',
                         'rgba(110, 231, 183, 0.8)',
+                        'rgba(16, 185, 129, 0.6)',
+                        'rgba(5, 150, 105, 0.6)',
+                        'rgba(4, 120, 87, 0.6)',
+                        'rgba(52, 211, 153, 0.6)',
+                        'rgba(110, 231, 183, 0.6)',
                     ],
                     'hoverOffset' => 15,
                     'hoverBorderColor' => 'rgba(16, 185, 129, 1)',
                     'hoverBorderWidth' => 3,
                 ],
             ],
-            'labels' => $classifications->pluck('name')->toArray(),
+            'labels' => $series->pluck('name')->toArray(),
         ];
     }
 
     protected function getType(): string
     {
-        return 'doughnut';
+        return 'bar';
     }
 
     protected function getOptions(): array
@@ -67,18 +78,14 @@ class ActsByClassificationChart extends ChartWidget
         return [
             'plugins' => [
                 'legend' => [
-                    'position' => 'bottom',
-                    'display' => true,
-                    'labels' => [
-                        'padding' => 10,
-                        'font' => [
-                            'size' => 11,
-                        ],
-                    ],
+                    'display' => false,
                 ],
             ],
-            'maintainAspectRatio' => false,
-            'responsive' => true,
+            'scales' => [
+                'y' => [
+                    'beginAtZero' => true,
+                ],
+            ],
         ];
     }
 }
