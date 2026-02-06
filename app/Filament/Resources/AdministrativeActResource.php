@@ -409,14 +409,14 @@ class AdministrativeActResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        if (auth()->user()?->hasRole('super_admin')) {
-            return static::getModel()::count();
-        } elseif (auth()->user()?->organizational_unit_id) {
-            return static::getModel()::where('organizational_unit_id', auth()->user()->organizational_unit_id)->count();
-        }
-        return null;
-    }
+        $user = auth()->user()?->fresh(); // Añade fresh() para recargar roles y atributos
 
+        if ($user && !$user->hasRole('super_admin') && $user->organizational_unit_id) {
+            return static::getModel()::where('organizational_unit_id', $user->organizational_unit_id)->count();
+        }
+
+        return static::getModel()::count();
+    }
     /**
      * Cuenta las paginas de un PDF de forma robusta.
      * Intenta con smalot/pdfparser primero, luego con regex como fallback.
