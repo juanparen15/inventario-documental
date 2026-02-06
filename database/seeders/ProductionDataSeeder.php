@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -166,7 +165,7 @@ class ProductionDataSeeder extends Seeder
         $this->command->info('Generating permissions...');
 
         try {
-            Artisan::call('shield:generate', ['--all' => true, '--option' => 'permissions']);
+            \Artisan::call('shield:generate', ['--all' => true, '--option' => 'permissions']);
 
             // Assign basic permissions to usuario role
             $usuarioRole = Role::where('name', 'usuario')->first();
