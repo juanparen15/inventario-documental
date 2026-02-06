@@ -260,6 +260,19 @@ class AdministrativeActResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
+                Tables\Columns\TextColumn::make('attachments')
+                    ->label('Archivos PDF')
+                    ->formatStateUsing(function ($state) {
+                        if (empty($state)) {
+                            return '-';
+                        }
+                        $count = is_array($state) ? count($state) : 1;
+                        return $count . ' PDF' . ($count > 1 ? 's' : '');
+                    })
+                    ->icon(fn ($state) => !empty($state) ? 'heroicon-o-document' : null)
+                    ->color(fn ($state) => !empty($state) ? 'success' : 'gray')
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('organizationalUnit.name')
                     ->label('Unidad')
                     ->searchable()

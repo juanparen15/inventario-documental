@@ -429,6 +429,19 @@ class InventoryRecordResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
+                Tables\Columns\TextColumn::make('attachments')
+                    ->label('Archivos PDF')
+                    ->formatStateUsing(function ($state) {
+                        if (empty($state)) {
+                            return '-';
+                        }
+                        $count = is_array($state) ? count($state) : 1;
+                        return $count . ' PDF' . ($count > 1 ? 's' : '');
+                    })
+                    ->icon(fn ($state) => !empty($state) ? 'heroicon-o-document' : null)
+                    ->color(fn ($state) => !empty($state) ? 'success' : 'gray')
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('creator.name')
                     ->label('Creado por')
                     ->sortable()
@@ -496,18 +509,6 @@ class InventoryRecordResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\Action::make('duplicate')
-                    ->label('Duplicar')
-                    ->icon('heroicon-o-document-duplicate')
-                    ->action(function (InventoryRecord $record) {
-                        $newRecord = $record->replicate();
-                        $newRecord->reference_code = null;
-                        $newRecord->title = $record->title . ' (Copia)';
-                        $newRecord->save();
-                    })
-                    ->requiresConfirmation()
-                    ->modalHeading('Duplicar Registro')
-                    ->modalDescription('Se creara una copia de este registro. El codigo de referencia sera generado automaticamente.'),
                 Tables\Actions\DeleteAction::make(),
                 Tables\Actions\ForceDeleteAction::make(),
                 Tables\Actions\RestoreAction::make(),
