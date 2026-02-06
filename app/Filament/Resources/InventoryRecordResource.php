@@ -120,7 +120,8 @@ class InventoryRecordResource extends Resource
 
                                 return DocumentarySeries::where(function ($query) use ($seriesIds) {
                                         $query->whereIn('id', $seriesIds)
-                                            ->where('is_active', true);
+                                            ->where('is_active', true)
+                                            ->where('context', 'fuid');
                                     })
                                     ->when($state, fn($query) => $query->orWhere('id', $state))
                                     ->orderBy('code')
@@ -167,7 +168,8 @@ class InventoryRecordResource extends Resource
 
                                 return DocumentarySubseries::where(function ($query) use ($subseriesIds) {
                                         $query->whereIn('id', $subseriesIds)
-                                            ->where('is_active', true);
+                                            ->where('is_active', true)
+                                            ->where('context', 'fuid');
                                     })
                                     ->when($state, fn($query) => $query->orWhere('id', $state))
                                     ->orderBy('code')

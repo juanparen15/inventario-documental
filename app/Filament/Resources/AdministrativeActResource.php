@@ -40,7 +40,22 @@ class AdministrativeActResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('organizational_unit_id')
                             ->label('Unidad Organizacional')
-                            ->relationship('organizationalUnit', 'name', fn(Builder $query) => $query->where('is_active', true))
+                            ->options(function () {
+                                $user = auth()->user();
+                                if ($user?->hasRole('super_admin')) {
+                                    return OrganizationalUnit::where('is_active', true)
+                                        ->orderBy('name')
+                                        ->pluck('name', 'id');
+                                }
+                                if ($user?->organizational_unit_id) {
+                                    return OrganizationalUnit::where('id', $user->organizational_unit_id)
+                                        ->pluck('name', 'id');
+                                }
+                                return [];
+                            })
+                            ->default(fn() => auth()->user()?->organizational_unit_id)
+                            ->disabled(fn() => !auth()->user()?->hasRole('super_admin'))
+                            ->dehydrated()
                             ->searchable()
                             ->preload()
                             ->required()
@@ -92,7 +107,8 @@ class AdministrativeActResource extends Resource
 
                                 return DocumentarySeries::where(function ($query) use ($seriesIds) {
                                         $query->whereIn('id', $seriesIds)
-                                            ->where('is_active', true);
+                                            ->where('is_active', true)
+                                            ->where('context', 'ccd');
                                     })
                                     ->when($state, fn($query) => $query->orWhere('id', $state))
                                     ->orderBy('code')
@@ -130,7 +146,8 @@ class AdministrativeActResource extends Resource
 
                                 return DocumentarySubseries::where(function ($query) use ($subseriesIds) {
                                         $query->whereIn('id', $subseriesIds)
-                                            ->where('is_active', true);
+                                            ->where('is_active', true)
+                                            ->where('context', 'ccd');
                                     })
                                     ->when($state, fn($query) => $query->orWhere('id', $state))
                                     ->orderBy('code')

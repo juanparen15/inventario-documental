@@ -118,24 +118,6 @@ document.addEventListener("DOMContentLoaded", function () {
                     },
                 },
                 {
-                    element: "[data-tour='menu-series']",
-                    popover: {
-                        title: "Series Documentales",
-                        description:
-                            "Las series documentales agrupan los documentos segun la Tabla de Retencion Documental (TRD). Son categorias principales como 'Contratos', 'Actas', etc.",
-                        side: "right",
-                    },
-                },
-                {
-                    element: "[data-tour='menu-subseries']",
-                    popover: {
-                        title: "Subseries Documentales",
-                        description:
-                            "Las subseries son subdivisiones de las series. Por ejemplo, dentro de 'Contratos' puedes tener 'Contratos de Prestacion de Servicios'.",
-                        side: "right",
-                    },
-                },
-                {
                     element: "[data-tour='help-button-dashboard']",
                     popover: {
                         title: "¿Necesitas ayuda?",
