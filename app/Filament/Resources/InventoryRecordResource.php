@@ -455,6 +455,7 @@ class InventoryRecordResource extends Resource
                             ->modalSubmitAction(false)
                             ->modalCancelActionLabel('Cerrar')
                     )
+                    ->sortable()
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('creator.name')
