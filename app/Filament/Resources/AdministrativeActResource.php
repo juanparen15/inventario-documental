@@ -271,6 +271,21 @@ class AdministrativeActResource extends Resource
                     })
                     ->icon(fn ($state) => !empty($state) ? 'heroicon-o-document' : null)
                     ->color(fn ($state) => !empty($state) ? 'success' : 'gray')
+                    ->action(
+                        Tables\Actions\Action::make('viewAttachments')
+                            ->modalHeading('Archivos PDF Adjuntos')
+                            ->modalContent(function (AdministrativeAct $record) {
+                                $attachments = $record->attachments ?? [];
+                                if (empty($attachments)) {
+                                    return view('filament.components.no-attachments');
+                                }
+                                return view('filament.components.attachments-list', [
+                                    'attachments' => $attachments,
+                                ]);
+                            })
+                            ->modalSubmitAction(false)
+                            ->modalCancelActionLabel('Cerrar')
+                    )
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('organizationalUnit.name')

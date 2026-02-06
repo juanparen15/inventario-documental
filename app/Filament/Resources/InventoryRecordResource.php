@@ -431,7 +431,6 @@ class InventoryRecordResource extends Resource
 
                 Tables\Columns\TextColumn::make('attachments')
                     ->label('Archivos PDF')
-                    ->sortable()
                     ->formatStateUsing(function ($state) {
                         if (empty($state)) {
                             return '-';
@@ -441,6 +440,21 @@ class InventoryRecordResource extends Resource
                     })
                     ->icon(fn ($state) => !empty($state) ? 'heroicon-o-document' : null)
                     ->color(fn ($state) => !empty($state) ? 'success' : 'gray')
+                    ->action(
+                        Tables\Actions\Action::make('viewAttachments')
+                            ->modalHeading('Archivos PDF Adjuntos')
+                            ->modalContent(function (InventoryRecord $record) {
+                                $attachments = $record->attachments ?? [];
+                                if (empty($attachments)) {
+                                    return view('filament.components.no-attachments');
+                                }
+                                return view('filament.components.attachments-list', [
+                                    'attachments' => $attachments,
+                                ]);
+                            })
+                            ->modalSubmitAction(false)
+                            ->modalCancelActionLabel('Cerrar')
+                    )
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('creator.name')
