@@ -212,33 +212,33 @@ document.addEventListener("DOMContentLoaded", function () {
                         side: "bottom",
                     },
                 },
-                {
-                    element: "[data-tour='download-template-inventory']",
-                    popover: {
-                        title: "Descargar plantilla Excel",
-                        description:
-                            "Descarga una plantilla de Excel con el formato correcto para importar registros masivamente. Muy util cuando tienes muchos registros que cargar.",
-                        side: "bottom",
-                    },
-                },
-                {
-                    element: "[data-tour='import-button-inventory']",
-                    popover: {
-                        title: "Importar desde Excel",
-                        description:
-                            "Sube un archivo Excel con los datos de tus registros para cargarlos al sistema de forma masiva. Usa la plantilla para asegurar el formato correcto.",
-                        side: "bottom",
-                    },
-                },
-                {
-                    element: "[data-tour='export-button-inventory']",
-                    popover: {
-                        title: "Exportar a Excel",
-                        description:
-                            "Exporta todos los registros visibles (con los filtros aplicados) a un archivo Excel para reportes o respaldos.",
-                        side: "bottom",
-                    },
-                },
+                // {
+                //     element: "[data-tour='download-template-inventory']",
+                //     popover: {
+                //         title: "Descargar plantilla Excel",
+                //         description:
+                //             "Descarga una plantilla de Excel con el formato correcto para importar registros masivamente. Muy util cuando tienes muchos registros que cargar.",
+                //         side: "bottom",
+                //     },
+                // },
+                // {
+                //     element: "[data-tour='import-button-inventory']",
+                //     popover: {
+                //         title: "Importar desde Excel",
+                //         description:
+                //             "Sube un archivo Excel con los datos de tus registros para cargarlos al sistema de forma masiva. Usa la plantilla para asegurar el formato correcto.",
+                //         side: "bottom",
+                //     },
+                // },
+                // {
+                //     element: "[data-tour='export-button-inventory']",
+                //     popover: {
+                //         title: "Exportar a Excel",
+                //         description:
+                //             "Exporta todos los registros visibles (con los filtros aplicados) a un archivo Excel para reportes o respaldos.",
+                //         side: "bottom",
+                //     },
+                // },
                 {
                     element: "[data-tour='help-button-inventory']",
                     popover: {
@@ -447,33 +447,33 @@ document.addEventListener("DOMContentLoaded", function () {
                         side: "bottom",
                     },
                 },
-                {
-                    element: "[data-tour='download-template-acts']",
-                    popover: {
-                        title: "Descargar plantilla Excel",
-                        description:
-                            "Descarga una plantilla con el formato correcto para importar actos administrativos de forma masiva.",
-                        side: "bottom",
-                    },
-                },
-                {
-                    element: "[data-tour='import-button-acts']",
-                    popover: {
-                        title: "Importar desde Excel",
-                        description:
-                            "Sube un archivo Excel para cargar multiples actos administrativos al sistema de una sola vez.",
-                        side: "bottom",
-                    },
-                },
-                {
-                    element: "[data-tour='export-button-acts']",
-                    popover: {
-                        title: "Exportar a Excel",
-                        description:
-                            "Descarga los actos administrativos en formato Excel para reportes o respaldos.",
-                        side: "bottom",
-                    },
-                },
+                // {
+                //     element: "[data-tour='download-template-acts']",
+                //     popover: {
+                //         title: "Descargar plantilla Excel",
+                //         description:
+                //             "Descarga una plantilla con el formato correcto para importar actos administrativos de forma masiva.",
+                //         side: "bottom",
+                //     },
+                // },
+                // {
+                //     element: "[data-tour='import-button-acts']",
+                //     popover: {
+                //         title: "Importar desde Excel",
+                //         description:
+                //             "Sube un archivo Excel para cargar multiples actos administrativos al sistema de una sola vez.",
+                //         side: "bottom",
+                //     },
+                // },
+                // {
+                //     element: "[data-tour='export-button-acts']",
+                //     popover: {
+                //         title: "Exportar a Excel",
+                //         description:
+                //             "Descarga los actos administrativos en formato Excel para reportes o respaldos.",
+                //         side: "bottom",
+                //     },
+                // },
                 {
                     element: "[data-tour='help-button-acts']",
                     popover: {
