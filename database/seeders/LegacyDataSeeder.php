@@ -31,6 +31,7 @@ class LegacyDataSeeder extends Seeder
     protected array $areaMapping = [];
     protected array $userMapping = [];
     protected array $clasificacionMapping = [];
+    protected array $requiproyectoToAreaMapping = [];
 
     public function run(): void
     {
@@ -47,6 +48,7 @@ class LegacyDataSeeder extends Seeder
 
         // Build mappings from legacy to new IDs
         $this->buildAreaMapping();
+        $this->buildRequiproyectoMapping();
         $this->buildUserMapping();
         $this->buildClassificationMapping();
 
@@ -90,6 +92,27 @@ class LegacyDataSeeder extends Seeder
             $this->command->info('  - Mapped ' . count($this->areaMapping) . ' areas');
         } catch (\Exception $e) {
             $this->command->warn('  - Could not build area mapping: ' . $e->getMessage());
+        }
+    }
+
+    protected function buildRequiproyectoMapping(): void
+    {
+        $this->command->info('Building requiproyecto to area mappings...');
+
+        try {
+            // requiproyectos has areas_id which relates to the area
+            $requiproyectos = DB::connection($this->oldConnection)->table('requiproyectos')->get();
+
+            foreach ($requiproyectos as $rp) {
+                $areaId = $rp->areas_id ?? null;
+                if ($areaId && isset($this->areaMapping[$areaId])) {
+                    $this->requiproyectoToAreaMapping[$rp->id] = $this->areaMapping[$areaId];
+                }
+            }
+
+            $this->command->info('  - Mapped ' . count($this->requiproyectoToAreaMapping) . ' requiproyectos');
+        } catch (\Exception $e) {
+            $this->command->warn('  - Could not build requiproyecto mapping: ' . $e->getMessage());
         }
     }
 
@@ -184,20 +207,20 @@ class LegacyDataSeeder extends Seeder
                     $baseSlug = Str::slug($row->objeto ?? 'acto');
                     $slug = $baseSlug . '-' . $row->id . '-' . substr(md5($row->id . time()), 0, 8);
 
-                    // Extract vigencia from consecutivo (format: YYYY.XXX.XX.XX.###)
+                    // The field is 'radicado' not 'consecutivo' in the old database
+                    $filingNumber = $row->radicado ?? null;
+
+                    // Extract year from fecha_acto for vigencia
                     $vigencia = null;
-                    if (!empty($row->consecutivo)) {
-                        $parts = explode('.', $row->consecutivo);
-                        if (count($parts) > 0 && is_numeric($parts[0]) && strlen($parts[0]) === 4) {
-                            $vigencia = $parts[0];
-                        }
+                    if ($actDate) {
+                        $vigencia = substr($actDate, 0, 4);
                     }
 
                     AdministrativeAct::create([
                         'user_id' => $userId,
                         'organizational_unit_id' => $organizationalUnitId,
                         'act_classification_id' => $classificationId,
-                        'filing_number' => $row->consecutivo ?? null,
+                        'filing_number' => $filingNumber,
                         'vigencia' => $vigencia,
                         'act_date' => $actDate,
                         'subject' => $row->objeto,
@@ -265,8 +288,9 @@ class LegacyDataSeeder extends Seeder
 
     protected function createInventoryRecord(object $row): void
     {
-        // Map relationships
-        $organizationalUnitId = $this->areaMapping[$row->area_id] ?? null;
+        // Map relationships - planadquisiciones uses requiproyecto_id, not area_id
+        $requiproyectoId = $row->requiproyecto_id ?? null;
+        $organizationalUnitId = $requiproyectoId ? ($this->requiproyectoToAreaMapping[$requiproyectoId] ?? null) : null;
         $userId = $this->userMapping[$row->user_id] ?? null;
 
         // If organizational unit not found, use a default
