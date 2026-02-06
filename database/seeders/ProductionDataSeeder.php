@@ -165,7 +165,11 @@ class ProductionDataSeeder extends Seeder
         $this->command->info('Generating permissions...');
 
         try {
-            \Artisan::call('shield:generate', ['--all' => true, '--option' => 'permissions']);
+            \Artisan::call('shield:generate', [
+                '--all' => true,
+                '--option' => 'permissions',
+                '--panel' => 'admin',
+            ]);
 
             // Assign basic permissions to usuario role
             $usuarioRole = Role::where('name', 'usuario')->first();
