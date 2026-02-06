@@ -319,7 +319,6 @@ class InventoryRecordResource extends Resource
                             ->downloadable()
                             ->openable()
                             ->reorderable()
-                            ->sortable()
                             ->helperText('Solo archivos PDF. Maximo 20MB por archivo.')
                             ->columnSpanFull(),
                     ]),
