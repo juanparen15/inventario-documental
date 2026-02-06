@@ -41,6 +41,7 @@ class ListInventoryRecords extends ListRecords
                 ->label('Descargar Plantilla')
                 ->icon('heroicon-o-document-arrow-down')
                 ->color('gray')
+                ->visible(fn() => auth()->user()?->hasRole('super_admin'))
                 ->extraAttributes([
                     'data-tour' => 'download-template-inventory',
                 ])
@@ -61,6 +62,7 @@ class ListInventoryRecords extends ListRecords
                 ->label('Importar')
                 ->icon('heroicon-o-arrow-up-tray')
                 ->color('success')
+                ->visible(fn() => auth()->user()?->hasRole('super_admin'))
                 ->extraAttributes([
                     'data-tour' => 'import-button-inventory',
                 ])
@@ -113,6 +115,7 @@ class ListInventoryRecords extends ListRecords
 
             ExportAction::make()
                 ->label('Exportar')
+                ->visible(fn() => auth()->user()?->hasRole('super_admin'))
                 ->extraAttributes([
                     'data-tour' => 'export-button-inventory',
                 ])
