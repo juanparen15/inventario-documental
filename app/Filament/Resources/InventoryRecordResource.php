@@ -119,10 +119,10 @@ class InventoryRecordResource extends Resource
                                     ->pluck('documentary_series_id');
 
                                 return DocumentarySeries::where(function ($query) use ($seriesIds) {
-                                    $query->whereIn('id', $seriesIds)
-                                        ->where('is_active', true)
-                                        ->where('context', 'fuid');
-                                })
+                                        $query->whereIn('id', $seriesIds)
+                                            ->where('is_active', true)
+                                            ->where('context', 'fuid');
+                                    })
                                     ->when($state, fn($query) => $query->orWhere('id', $state))
                                     ->orderBy('code')
                                     ->get()
@@ -167,9 +167,9 @@ class InventoryRecordResource extends Resource
                                 }
 
                                 return DocumentarySubseries::where(function ($query) use ($subseriesIds) {
-                                    $query->whereIn('id', $subseriesIds)
-                                        ->where('is_active', true);
-                                })
+                                        $query->whereIn('id', $subseriesIds)
+                                            ->where('is_active', true);
+                                    })
                                     ->when($state, fn($query) => $query->orWhere('id', $state))
                                     ->orderBy('code')
                                     ->get()
@@ -372,17 +372,18 @@ class InventoryRecordResource extends Resource
                     ->sortable()
                     ->copyable(),
 
-                Tables\Columns\TextColumn::make('title')
-                    ->label('Unidad Documental')
-                    ->searchable()
-                    ->limit(30)
-                    ->tooltip(fn($record) => $record->title),
+                // Tables\Columns\TextColumn::make('title')
+                //     ->label('Unidad Documental')
+                //     ->searchable()
+                //     ->limit(30)
+                //     ->tooltip(fn($record) => $record->title),
 
                 Tables\Columns\TextColumn::make('organizationalUnit.name')
                     ->label('Oficina Productora')
                     ->searchable()
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable()
+                    ->visible(fn() => auth()->user()?->hasRole('super_admin')),
 
                 Tables\Columns\TextColumn::make('inventory_purpose')
                     ->label('Objeto')
@@ -400,7 +401,7 @@ class InventoryRecordResource extends Resource
                     ->label('Subserie')
                     ->searchable()
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('box')
                     ->label('Caja')
@@ -439,8 +440,8 @@ class InventoryRecordResource extends Resource
                         $count = is_array($state) ? count($state) : 1;
                         return $count . ' PDF' . ($count > 1 ? 's' : '');
                     })
-                    ->icon(fn($state) => !empty($state) ? 'heroicon-o-document' : null)
-                    ->color(fn($state) => !empty($state) ? 'success' : 'gray')
+                    ->icon(fn ($state) => !empty($state) ? 'heroicon-o-document' : null)
+                    ->color(fn ($state) => !empty($state) ? 'success' : 'gray')
                     ->action(
                         Tables\Actions\Action::make('viewAttachments')
                             ->modalHeading('Archivos PDF Adjuntos')
@@ -580,13 +581,10 @@ class InventoryRecordResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        // Usar el guard 'web' o el que tengas configurado en Filament
-        $user = auth()->guard('web')->user();
-
-        if ($user && $user->organizational_unit_id && !$user->hasRole('super_admin')) {
-            return (string) static::getModel()::where('organizational_unit_id', $user->organizational_unit_id)->count();
+        $user = auth()->user();
+        if ($user && !$user->hasRole('super_admin') && $user->organizational_unit_id) {
+            return static::getModel()::where('organizational_unit_id', $user->organizational_unit_id)->count();
         }
-
-        return (string) static::getModel()::count();
+        return static::getModel()::count();
     }
 }

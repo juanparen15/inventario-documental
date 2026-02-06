@@ -23,7 +23,8 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             ProductionDataSeeder::class,
-            LegacyDataSeeder::class,
+            DataMigrationSeeder::class,
+            // LegacyDataSeeder::class, // Uncomment if you want to seed legacy inventory records and acts
         ]);
     }
 }
