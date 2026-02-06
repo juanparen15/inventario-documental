@@ -168,8 +168,7 @@ class InventoryRecordResource extends Resource
 
                                 return DocumentarySubseries::where(function ($query) use ($subseriesIds) {
                                         $query->whereIn('id', $subseriesIds)
-                                            ->where('is_active', true)
-                                            ->where('context', 'fuid');
+                                            ->where('is_active', true);
                                     })
                                     ->when($state, fn($query) => $query->orWhere('id', $state))
                                     ->orderBy('code')
@@ -581,6 +580,10 @@ class InventoryRecordResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
+        $user = auth()->user();
+        if ($user && !$user->hasRole('super_admin') && $user->organizational_unit_id) {
+            return static::getModel()::where('organizational_unit_id', $user->organizational_unit_id)->count();
+        }
         return static::getModel()::count();
     }
 }

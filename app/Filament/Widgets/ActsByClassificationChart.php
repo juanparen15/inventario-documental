@@ -12,8 +12,8 @@ class ActsByClassificationChart extends ChartWidget
     protected static ?int $sort = 3;
 
     protected int | string | array $columnSpan = [
-        'md' => 2,
-        'xl' => 2,
+        'md' => 3,
+        'xl' => 3,
     ];
 
     protected static ?string $maxHeight = '350px';
@@ -39,7 +39,7 @@ class ActsByClassificationChart extends ChartWidget
         $series = $query
             ->having('administrative_acts_count', '>', 0)
             ->orderByDesc('administrative_acts_count')
-            ->limit(10)
+            ->limit(8)
             ->get();
 
         return [
@@ -56,8 +56,6 @@ class ActsByClassificationChart extends ChartWidget
                         'rgba(16, 185, 129, 0.6)',
                         'rgba(5, 150, 105, 0.6)',
                         'rgba(4, 120, 87, 0.6)',
-                        'rgba(52, 211, 153, 0.6)',
-                        'rgba(110, 231, 183, 0.6)',
                     ],
                     'hoverOffset' => 15,
                     'hoverBorderColor' => 'rgba(16, 185, 129, 1)',
@@ -70,7 +68,7 @@ class ActsByClassificationChart extends ChartWidget
 
     protected function getType(): string
     {
-        return 'bar';
+        return 'doughnut';
     }
 
     protected function getOptions(): array
@@ -78,14 +76,18 @@ class ActsByClassificationChart extends ChartWidget
         return [
             'plugins' => [
                 'legend' => [
-                    'display' => false,
+                    'position' => 'right',
+                    'display' => true,
+                    'labels' => [
+                        'padding' => 10,
+                        'font' => [
+                            'size' => 11,
+                        ],
+                    ],
                 ],
             ],
-            'scales' => [
-                'y' => [
-                    'beginAtZero' => true,
-                ],
-            ],
+            'maintainAspectRatio' => false,
+            'responsive' => true,
         ];
     }
 }

@@ -12,8 +12,8 @@ class RecordsBySeriesChart extends ChartWidget
     protected static ?int $sort = 2;
 
     protected int | string | array $columnSpan = [
-        'md' => 2,
-        'xl' => 2,
+        'md' => 3,
+        'xl' => 3,
     ];
 
     protected static ?string $maxHeight = '350px';
@@ -37,7 +37,7 @@ class RecordsBySeriesChart extends ChartWidget
         $series = $query
             ->having('inventory_records_count', '>', 0)
             ->orderByDesc('inventory_records_count')
-            ->limit(10)
+            ->limit(8)
             ->get();
 
         return [
@@ -54,8 +54,6 @@ class RecordsBySeriesChart extends ChartWidget
                         'rgba(30, 64, 175, 0.8)',
                         'rgba(59, 130, 246, 0.6)',
                         'rgba(37, 99, 235, 0.6)',
-                        'rgba(96, 165, 250, 0.6)',
-                        'rgba(29, 78, 216, 0.6)',
                     ],
                     'hoverOffset' => 15,
                     'hoverBorderColor' => 'rgba(59, 130, 246, 1)',
@@ -68,7 +66,7 @@ class RecordsBySeriesChart extends ChartWidget
 
     protected function getType(): string
     {
-        return 'bar';
+        return 'doughnut';
     }
 
     protected function getOptions(): array
@@ -76,14 +74,18 @@ class RecordsBySeriesChart extends ChartWidget
         return [
             'plugins' => [
                 'legend' => [
-                    'display' => false,
+                    'position' => 'right',
+                    'display' => true,
+                    'labels' => [
+                        'padding' => 10,
+                        'font' => [
+                            'size' => 11,
+                        ],
+                    ],
                 ],
             ],
-            'scales' => [
-                'y' => [
-                    'beginAtZero' => true,
-                ],
-            ],
+            'maintainAspectRatio' => false,
+            'responsive' => true,
         ];
     }
 }

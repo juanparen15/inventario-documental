@@ -69,7 +69,7 @@ class AdministrativeActResource extends Resource
 
                         Forms\Components\Placeholder::make('vigencia_display')
                             ->label('Vigencia')
-                            ->content(fn (?AdministrativeAct $record) => $record?->vigencia ?? date('Y'))
+                            ->content(fn(?AdministrativeAct $record) => $record?->vigencia ?? date('Y'))
                             ->extraAttributes(['data-tour' => 'act-vigencia']),
 
                         Forms\Components\Hidden::make('vigencia')
@@ -106,10 +106,10 @@ class AdministrativeActResource extends Resource
                                     ->pluck('documentary_series_id');
 
                                 return DocumentarySeries::where(function ($query) use ($seriesIds) {
-                                        $query->whereIn('id', $seriesIds)
-                                            ->where('is_active', true)
-                                            ->where('context', 'ccd');
-                                    })
+                                    $query->whereIn('id', $seriesIds)
+                                        ->where('is_active', true)
+                                        ->where('context', 'ccd');
+                                })
                                     ->when($state, fn($query) => $query->orWhere('id', $state))
                                     ->orderBy('code')
                                     ->get()
@@ -145,10 +145,10 @@ class AdministrativeActResource extends Resource
                                 }
 
                                 return DocumentarySubseries::where(function ($query) use ($subseriesIds) {
-                                        $query->whereIn('id', $subseriesIds)
-                                            ->where('is_active', true)
-                                            ->where('context', 'ccd');
-                                    })
+                                    $query->whereIn('id', $subseriesIds)
+                                        ->where('is_active', true)
+                                        ->where('context', 'ccd');
+                                })
                                     ->when($state, fn($query) => $query->orWhere('id', $state))
                                     ->orderBy('code')
                                     ->get()
@@ -287,8 +287,8 @@ class AdministrativeActResource extends Resource
                         $count = is_array($state) ? count($state) : 1;
                         return $count . ' PDF' . ($count > 1 ? 's' : '');
                     })
-                    ->icon(fn ($state) => !empty($state) ? 'heroicon-o-document' : null)
-                    ->color(fn ($state) => !empty($state) ? 'success' : 'gray')
+                    ->icon(fn($state) => !empty($state) ? 'heroicon-o-document' : null)
+                    ->color(fn($state) => !empty($state) ? 'success' : 'gray')
                     ->action(
                         Tables\Actions\Action::make('viewAttachments')
                             ->modalHeading('Archivos PDF Adjuntos')
@@ -409,6 +409,10 @@ class AdministrativeActResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
+        $user = auth()->user();
+        if ($user && !$user->hasRole('super_admin') && $user->organizational_unit_id) {
+            return static::getModel()::where('organizational_unit_id', $user->organizational_unit_id)->count();
+        }
         return static::getModel()::count();
     }
 
