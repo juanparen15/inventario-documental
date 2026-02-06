@@ -580,10 +580,11 @@ class InventoryRecordResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        $user = auth()->user();
-        if ($user && !$user->hasRole('super_admin') && $user->organizational_unit_id) {
-            return static::getModel()::where('organizational_unit_id', $user->organizational_unit_id)->count();
+        if (auth()->user()?->hasRole('super_admin')) {
+            return static::getModel()::count();
+        } elseif (auth()->user()?->organizational_unit_id) {
+            return static::getModel()::where('organizational_unit_id', auth()->user()->organizational_unit_id)->count();
         }
-        return static::getModel()::count();
+        return null;
     }
 }
