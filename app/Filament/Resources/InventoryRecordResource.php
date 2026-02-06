@@ -580,12 +580,13 @@ class InventoryRecordResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        $user = auth()->user()?->fresh(); // Añade fresh() para recargar roles y atributos
+        // Usar el guard 'web' o el que tengas configurado en Filament
+        $user = auth()->guard('web')->user();
 
-        if ($user && !$user->hasRole('super_admin') && $user->organizational_unit_id) {
-            return static::getModel()::where('organizational_unit_id', $user->organizational_unit_id)->count();
+        if ($user && $user->organizational_unit_id && !$user->hasRole('super_admin')) {
+            return (string) static::getModel()::where('organizational_unit_id', $user->organizational_unit_id)->count();
         }
 
-        return static::getModel()::count();
+        return (string) static::getModel()::count();
     }
 }
