@@ -19,6 +19,10 @@ class RecordsTimelineChart extends ChartWidget
 
     protected function getData(): array
     {
+        $user = auth()->user();
+        $isSuperAdmin = $user?->hasRole('super_admin');
+        $unitId = $user?->organizational_unit_id;
+
         $driver = DB::connection()->getDriverName();
         $currentYear = (int) date('Y');
         $minYear = 2010;
@@ -32,27 +36,39 @@ class RecordsTimelineChart extends ChartWidget
         }
 
         // FUID data
-        $fuidData = InventoryRecord::select(
+        $fuidQuery = InventoryRecord::select(
             DB::raw("{$yearExpressionStart} as year"),
             DB::raw('COUNT(*) as count')
         )
             ->whereNotNull('start_date')
             ->where('has_start_date', true)
             ->whereRaw("{$yearExpressionStart} >= ?", [$minYear])
-            ->whereRaw("{$yearExpressionStart} <= ?", [$currentYear])
+            ->whereRaw("{$yearExpressionStart} <= ?", [$currentYear]);
+
+        if (!$isSuperAdmin && $unitId) {
+            $fuidQuery->where('organizational_unit_id', $unitId);
+        }
+
+        $fuidData = $fuidQuery
             ->groupBy('year')
             ->orderBy('year', 'asc')
             ->get()
             ->keyBy('year');
 
         // CCD data
-        $ccdData = AdministrativeAct::select(
+        $ccdQuery = AdministrativeAct::select(
             DB::raw("{$yearExpressionAct} as year"),
             DB::raw('COUNT(*) as count')
         )
             ->whereNotNull('created_at')
             ->whereRaw("{$yearExpressionAct} >= ?", [$minYear])
-            ->whereRaw("{$yearExpressionAct} <= ?", [$currentYear])
+            ->whereRaw("{$yearExpressionAct} <= ?", [$currentYear]);
+
+        if (!$isSuperAdmin && $unitId) {
+            $ccdQuery->where('organizational_unit_id', $unitId);
+        }
+
+        $ccdData = $ccdQuery
             ->groupBy('year')
             ->orderBy('year', 'asc')
             ->get()

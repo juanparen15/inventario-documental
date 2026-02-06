@@ -15,6 +15,12 @@ class DocumentsByUnitComparisonChart extends ChartWidget
 
     protected static ?string $maxHeight = '350px';
 
+    // Solo visible para super_admin
+    public static function canView(): bool
+    {
+        return auth()->user()?->hasRole('super_admin') ?? false;
+    }
+
     protected function getData(): array
     {
         $units = OrganizationalUnit::withCount(['inventoryRecords', 'administrativeActs'])

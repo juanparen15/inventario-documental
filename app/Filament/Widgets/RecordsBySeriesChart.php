@@ -20,8 +20,22 @@ class RecordsBySeriesChart extends ChartWidget
 
     protected function getData(): array
     {
-        $series = DocumentarySeries::withCount('inventoryRecords')
-            ->has('inventoryRecords')
+        $user = auth()->user();
+        $isSuperAdmin = $user?->hasRole('super_admin');
+        $unitId = $user?->organizational_unit_id;
+
+        $query = DocumentarySeries::query();
+
+        if (!$isSuperAdmin && $unitId) {
+            $query->withCount(['inventoryRecords' => function ($q) use ($unitId) {
+                $q->where('organizational_unit_id', $unitId);
+            }]);
+        } else {
+            $query->withCount('inventoryRecords');
+        }
+
+        $series = $query
+            ->having('inventory_records_count', '>', 0)
             ->orderByDesc('inventory_records_count')
             ->limit(10)
             ->get();

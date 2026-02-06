@@ -20,10 +20,21 @@ class ActsByClassificationChart extends ChartWidget
 
     protected function getData(): array
     {
-        $classifications = ActClassification::withCount('administrativeActs')
-            ->where('is_active', true)
-            ->orderByDesc('administrative_acts_count')
-            ->get();
+        $user = auth()->user();
+        $isSuperAdmin = $user?->hasRole('super_admin');
+        $unitId = $user?->organizational_unit_id;
+
+        $query = ActClassification::query()->where('is_active', true);
+
+        if (!$isSuperAdmin && $unitId) {
+            $query->withCount(['administrativeActs' => function ($q) use ($unitId) {
+                $q->where('organizational_unit_id', $unitId);
+            }]);
+        } else {
+            $query->withCount('administrativeActs');
+        }
+
+        $classifications = $query->orderByDesc('administrative_acts_count')->get();
 
         return [
             'datasets' => [
