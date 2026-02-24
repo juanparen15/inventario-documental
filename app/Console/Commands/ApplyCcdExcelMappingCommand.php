@@ -76,6 +76,29 @@ class ApplyCcdExcelMappingCommand extends Command
         DB::beginTransaction();
 
         try {
+            // ── Paso 0: eliminar acceso de unidades NO incluidas en el Excel ─
+            // Para las series 03 y 24, solo las 10 dependencias del Excel deben tener entradas.
+            $allowedUnitIds = $units->pluck('id');
+
+            foreach ($series as $serie) {
+                $outsiders = CcdEntry::where('documentary_series_id', $serie->id)
+                    ->whereNotIn('organizational_unit_id', $allowedUnitIds)
+                    ->get();
+
+                foreach ($outsiders as $entry) {
+                    $unitCode = OrganizationalUnit::withTrashed()->find($entry->organizational_unit_id)?->code ?? "id={$entry->organizational_unit_id}";
+                    $subCode  = $entry->documentary_subseries_id
+                        ? ($subseries->get($serie->id, collect())->firstWhere('id', $entry->documentary_subseries_id)?->code ?? '?')
+                        : '(sin sub)';
+                    $this->line("  <fg=red>ELIMINAR</> {$unitCode} | serie {$serie->code} | sub {$subCode}  [unidad no está en Excel]");
+                    if (! $dryRun) {
+                        $entry->delete();
+                    }
+                    $deleted++;
+                }
+            }
+
+            // ── Paso 1: ajustar entradas de las 10 unidades del Excel ────────
             foreach ($this->mapping as $unitCode => $seriesMap) {
                 $unit = $units->get($unitCode);
                 if (! $unit) {
