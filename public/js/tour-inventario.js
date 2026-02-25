@@ -433,41 +433,29 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // ========================================================
-    // TOUR 5: CREAR ACTO ADMINISTRATIVO (WIZARD 3 PASOS)
+    // TOUR 5: CREAR ACTO ADMINISTRATIVO
+    // Un mini-tour por cada paso del wizard, disparado automáticamente
+    // cuando el usuario avanza de paso (MutationObserver en fi-active).
     // ========================================================
     if (isActsCreate) {
-        var tourActsCreate = driverFn({
+
+        // ── Tour del Paso 1: Clasificación ────────────────────────────────
+        var tourActsStep1 = driverFn({
             showProgress: true,
             nextBtnText: "Siguiente",
             prevBtnText: "Anterior",
             doneBtnText: "Entendido",
             progressText: "Paso {{current}} de {{total}}",
             steps: [
-                // ── Introducción ──────────────────────────────────────────────
                 {
-                    popover: {
-                        title: "Registrar un Acto Administrativo",
-                        description:
-                            "El formulario tiene <strong>3 pasos</strong>. " +
-                            "Los tabs de arriba indican en cuál estás. " +
-                            "Completa cada paso y haz clic en <em>Siguiente</em> para avanzar.",
-                    },
-                },
-
-                // ── Tab del paso 1 ────────────────────────────────────────────
-                {
-                    element: ".fi-fo-wizard-header-step:nth-child(1)",
                     popover: {
                         title: "Paso 1 — Clasificación",
                         description:
-                            "Aquí seleccionas la <strong>dependencia</strong>, la <strong>serie</strong> " +
-                            "y la <strong>subserie</strong> que clasifican el acto según el CCD. " +
-                            "El consecutivo se genera automáticamente.",
-                        side: "bottom",
+                            "Selecciona la <strong>dependencia</strong>, la <strong>serie</strong> " +
+                            "y la <strong>subserie</strong> del acto según el CCD. " +
+                            "El consecutivo se genera automáticamente al guardar.",
                     },
                 },
-
-                // ── Campos del paso 1 ─────────────────────────────────────────
                 {
                     element: "[data-tour='act-unidad']",
                     popover: {
@@ -484,7 +472,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         title: "Vigencia",
                         description:
                             "Año al que corresponde el acto. " +
-                            "Se usa para generar el consecutivo y para filtrar registros por año.",
+                            "Se usa para generar el consecutivo y filtrar por año.",
                         side: "bottom",
                     },
                 },
@@ -504,7 +492,8 @@ document.addEventListener("DOMContentLoaded", function () {
                         title: "Subserie Documental",
                         description:
                             "Selecciona la subserie: Resoluciones, Decretos, Circulares, " +
-                            "Comunicaciones Externas o Internas. Las opciones dependen de la serie elegida.",
+                            "Comunicaciones Externas o Internas. " +
+                            "Las opciones dependen de la serie elegida.",
                         side: "bottom",
                     },
                 },
@@ -513,71 +502,178 @@ document.addEventListener("DOMContentLoaded", function () {
                     popover: {
                         title: "Consecutivo (automático)",
                         description:
-                            "El sistema genera el número de consecutivo automáticamente. " +
+                            "El número de consecutivo se genera automáticamente. " +
                             "Formato: <strong>2026.DA.03.02.001</strong>. " +
-                            "No debes escribirlo — se asigna al guardar.",
+                            "No debes escribirlo.",
                         side: "top",
                     },
                 },
-
-                // ── Tab del paso 2 ────────────────────────────────────────────
-                {
-                    element: ".fi-fo-wizard-header-step:nth-child(2)",
-                    popover: {
-                        title: "Paso 2 — Detalle",
-                        description:
-                            "Al hacer clic en <strong>Siguiente</strong> llegarás a este paso. " +
-                            "Aquí escribes el <strong>Objeto / Asunto</strong> del acto (obligatorio) " +
-                            "y las <strong>Notas</strong> adicionales (opcional).",
-                        side: "bottom",
-                    },
-                },
-
-                // ── Tab del paso 3 ────────────────────────────────────────────
-                {
-                    element: ".fi-fo-wizard-header-step:nth-child(3)",
-                    popover: {
-                        title: "Paso 3 — Documentos",
-                        description:
-                            "En el último paso puedes adjuntar los <strong>documentos PDF</strong> " +
-                            "del acto (opcional, máximo 20 MB por archivo). " +
-                            "El sistema cuenta los folios automáticamente. " +
-                            "Aquí también está el botón <strong>Guardar</strong>.",
-                        side: "bottom",
-                    },
-                },
-
-                // ── Botón de ayuda ────────────────────────────────────────────
-                {
-                    element: "[data-tour='help-button-acts-create']",
-                    popover: {
-                        title: "¿Necesitas ayuda?",
-                        description:
-                            "Puedes ver este tutorial nuevamente en cualquier momento haciendo clic aquí.",
-                        side: "bottom",
-                    },
-                },
-
-                // ── Cierre ────────────────────────────────────────────────────
                 {
                     popover: {
-                        title: "¡Ya estás listo!",
+                        title: "¡Listo el Paso 1!",
                         description:
-                            "Completa los 3 pasos y haz clic en <strong>Guardar</strong>. " +
-                            "El acto quedará registrado con su consecutivo único.",
+                            "Completa los campos y haz clic en " +
+                            "<strong>Siguiente →</strong> para ir al Paso 2: Detalle.",
                     },
                 },
             ],
         });
 
-        window.tourActsCreate = tourActsCreate;
+        // ── Tour del Paso 2: Detalle ──────────────────────────────────────
+        var tourActsStep2 = driverFn({
+            showProgress: true,
+            nextBtnText: "Siguiente",
+            prevBtnText: "Anterior",
+            doneBtnText: "Entendido",
+            progressText: "Paso {{current}} de {{total}}",
+            steps: [
+                {
+                    popover: {
+                        title: "Paso 2 — Detalle del Acto",
+                        description:
+                            "Describe el acto administrativo. " +
+                            "El <strong>Objeto / Asunto</strong> es obligatorio; " +
+                            "las <strong>Notas</strong> son opcionales.",
+                    },
+                },
+                {
+                    element: "[data-tour='act-asunto']",
+                    popover: {
+                        title: "Objeto / Asunto",
+                        description:
+                            "Escribe de qué trata el acto. Ejemplo: " +
+                            "<em>'Por la cual se reglamenta el proceso de contratación...'</em>",
+                        side: "top",
+                    },
+                },
+                {
+                    element: "[data-tour='act-notas']",
+                    popover: {
+                        title: "Notas (opcional)",
+                        description:
+                            "Observaciones o información adicional sobre el acto. " +
+                            "Puedes dejarlo vacío.",
+                        side: "top",
+                    },
+                },
+                {
+                    popover: {
+                        title: "¡Listo el Paso 2!",
+                        description:
+                            "Haz clic en <strong>Siguiente →</strong> para ir al Paso 3: Documentos.",
+                    },
+                },
+            ],
+        });
 
+        // ── Tour del Paso 3: Documentos ───────────────────────────────────
+        var tourActsStep3 = driverFn({
+            showProgress: true,
+            nextBtnText: "Siguiente",
+            prevBtnText: "Anterior",
+            doneBtnText: "Entendido",
+            progressText: "Paso {{current}} de {{total}}",
+            steps: [
+                {
+                    popover: {
+                        title: "Paso 3 — Documentos Adjuntos",
+                        description:
+                            "Adjunta los <strong>documentos PDF</strong> del acto (opcional). " +
+                            "Cuando termines haz clic en <strong>Guardar</strong>.",
+                    },
+                },
+                {
+                    element: "[data-tour='act-adjuntos']",
+                    popover: {
+                        title: "Documentos PDF",
+                        description:
+                            "Sube uno o varios archivos PDF. " +
+                            "Máximo <strong>20 MB</strong> por archivo.",
+                        side: "top",
+                    },
+                },
+                {
+                    element: "[data-tour='act-folios']",
+                    popover: {
+                        title: "Folios (automático)",
+                        description:
+                            "El número total de páginas de los PDF se calcula automáticamente.",
+                        side: "top",
+                    },
+                },
+                {
+                    element: "[data-tour='help-button-acts-create']",
+                    popover: {
+                        title: "¿Necesitas ayuda?",
+                        description:
+                            "Puedes volver a ver el tour de cualquier paso haciendo clic aquí.",
+                        side: "bottom",
+                    },
+                },
+                {
+                    popover: {
+                        title: "¡Todo listo!",
+                        description:
+                            "Haz clic en <strong>Guardar</strong> para registrar el acto " +
+                            "con su consecutivo único.",
+                    },
+                },
+            ],
+        });
+
+        window.tourActsStep1 = tourActsStep1;
+        window.tourActsStep2 = tourActsStep2;
+        window.tourActsStep3 = tourActsStep3;
+        // Compatibilidad con iniciarTour global
+        window.tourActsCreate = tourActsStep1;
+
+        // ── Arrancar tour del paso 1 al cargar ────────────────────────────
         var tourActsCreateShown = localStorage.getItem("tourActsCreateShown");
         if (!tourActsCreateShown) {
             setTimeout(function () {
-                tourActsCreate.drive();
+                tourActsStep1.drive();
                 localStorage.setItem("tourActsCreateShown", "true");
             }, 1000);
+        }
+
+        // ── MutationObserver: disparar tour cuando el wizard avanza ───────
+        // Las clases de paso activo/inactivo las pone Alpine en .fi-fo-wizard-step
+        var wizardStepToured = 0; // índice del último paso que ya lanzó su tour
+
+        var wizardStepEls = document.querySelectorAll(".fi-fo-wizard-step");
+
+        if (wizardStepEls.length) {
+            var stepObserver = new MutationObserver(function (mutations) {
+                mutations.forEach(function (mutation) {
+                    if (mutation.type !== "attributes") return;
+
+                    var el = mutation.target;
+                    // Solo nos interesa cuando un paso SE ACTIVA
+                    if (!el.classList.contains("fi-active")) return;
+
+                    var idx = Array.from(wizardStepEls).indexOf(el);
+
+                    if (idx === 1 && wizardStepToured < 1) {
+                        wizardStepToured = 1;
+                        // Pequeño delay para que el wizard termine la transición
+                        setTimeout(function () {
+                            tourActsStep2.drive();
+                        }, 350);
+                    } else if (idx === 2 && wizardStepToured < 2) {
+                        wizardStepToured = 2;
+                        setTimeout(function () {
+                            tourActsStep3.drive();
+                        }, 350);
+                    }
+                });
+            });
+
+            wizardStepEls.forEach(function (el) {
+                stepObserver.observe(el, {
+                    attributes: true,
+                    attributeFilter: ["class"],
+                });
+            });
         }
     }
 
@@ -596,7 +692,23 @@ document.addEventListener("DOMContentLoaded", function () {
     };
 
     // Iniciar el tour de la pagina actual manualmente
+    // En la página de crear acto, lanza el tour del paso activo del wizard
     window.iniciarTour = function () {
+        if (window.tourActsStep1) {
+            var activeStep = document.querySelector(".fi-fo-wizard-step.fi-active");
+            var allSteps = document.querySelectorAll(".fi-fo-wizard-step");
+            var idx = activeStep ? Array.from(allSteps).indexOf(activeStep) : 0;
+
+            if (idx === 1 && window.tourActsStep2) {
+                window.tourActsStep2.drive();
+            } else if (idx === 2 && window.tourActsStep3) {
+                window.tourActsStep3.drive();
+            } else {
+                window.tourActsStep1.drive();
+            }
+            return;
+        }
+
         if (window.tourInventoryList) {
             window.tourInventoryList.drive();
         } else if (window.tourInventoryCreate) {
