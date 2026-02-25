@@ -433,7 +433,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // ========================================================
-    // TOUR 5: CREAR ACTO ADMINISTRATIVO
+    // TOUR 5: CREAR ACTO ADMINISTRATIVO (WIZARD 3 PASOS)
     // ========================================================
     if (isActsCreate) {
         var tourActsCreate = driverFn({
@@ -443,117 +443,125 @@ document.addEventListener("DOMContentLoaded", function () {
             doneBtnText: "Entendido",
             progressText: "Paso {{current}} de {{total}}",
             steps: [
+                // ── Introducción ──────────────────────────────────────────────
                 {
                     popover: {
-                        title: "REGISTRAR UN ACTO ADMINISTRATIVO",
+                        title: "Registrar un Acto Administrativo",
                         description:
-                            "Completa este formulario para registrar un nuevo acto administrativo. Los campos con * son obligatorios. Puedes adjuntar los documentos PDF al final.",
+                            "El formulario está dividido en <strong>3 pasos</strong>:<br><br>" +
+                            "1. <strong>Clasificación</strong> — dependencia y tipo de acto<br>" +
+                            "2. <strong>Detalle</strong> — objeto y notas<br>" +
+                            "3. <strong>Documentos</strong> — archivos PDF adjuntos<br><br>" +
+                            "Completa cada paso y haz clic en <em>Siguiente</em> para avanzar.",
                     },
                 },
+
+                // ── Paso 1: Clasificación (elementos visibles al cargar) ──────
                 {
                     element: "[data-tour='act-unidad']",
                     popover: {
-                        title: "Paso 1: Unidad Organizacional",
+                        title: "Paso 1 — Unidad Organizacional",
                         description:
-                            "Selecciona la oficina o dependencia que esta registrando el acto administrativo. <strong>Si eres usuario, ya esta seleccionada tu unidad automaticamente.</strong>",
+                            "Selecciona la dependencia que registra el acto. " +
+                            "Si eres usuario normal, ya aparece seleccionada tu unidad automáticamente.",
                         side: "right",
                     },
                 },
                 {
                     element: "[data-tour='act-vigencia']",
                     popover: {
-                        title: "Paso 2: Vigencia del Acto",
+                        title: "Paso 1 — Vigencia",
                         description:
-                            "El año de vigencia del acto administrativo. Este valor se usa para agrupar y filtrar los actos por año.",
-                        side: "right",
-                    },
-                },
-                {
-                    element: "[data-tour='act-consecutivo']",
-                    popover: {
-                        title: "Paso 3: Numero de Consecutivo",
-                        description:
-                            "El numero de consecutivo se digitará <strong>automaticamente</strong> basado en la unidad, serie y subserie seleccionadas. Este numero permite ubicar el documento en el sistema.",
+                            "Año al que corresponde el acto administrativo. " +
+                            "Se usa para generar el consecutivo y para filtrar registros por año.",
                         side: "right",
                     },
                 },
                 {
                     element: "[data-tour='act-serie']",
                     popover: {
-                        title: "Paso 4: Serie del Acto",
+                        title: "Paso 1 — Serie Documental",
                         description:
-                            "Selecciona la serie documental que clasifica el acto administrativo. Ejemplo: 'Resoluciones', 'Decretos', 'Circulares', etc.",
+                            "Selecciona la serie según el CCD. Ejemplo: " +
+                            "<em>03 - Actos Administrativos</em> o <em>24 - Comunicaciones Oficiales</em>.",
                         side: "right",
                     },
                 },
                 {
                     element: "[data-tour='act-subserie']",
                     popover: {
-                        title: "Paso 5: Subserie del Acto",
+                        title: "Paso 1 — Subserie Documental",
                         description:
-                            "Selecciona la subserie correspondiente dentro de la serie elegida. Las opciones dependen de la serie seleccionada en el paso anterior.",
+                            "Selecciona la subserie: Resoluciones, Decretos, Circulares, " +
+                            "Comunicaciones Externas o Internas. Las opciones dependen de la serie elegida.",
                         side: "right",
                     },
                 },
                 {
-                    element: "[data-tour='act-asunto']",
+                    element: "[data-tour='act-consecutivo']",
                     popover: {
-                        title: "Paso 6: Objeto / Asunto",
+                        title: "Paso 1 — Consecutivo (automático)",
                         description:
-                            "Describe brevemente de que trata el acto administrativo. <strong>Ejemplo:</strong> 'Por la cual se nombra al director de...' o 'Regulacion del proceso de...'.",
-                        side: "top",
+                            "El sistema genera el número de consecutivo automáticamente con el formato " +
+                            "<strong>2026.DA.03.02.001</strong>. No debes escribirlo manualmente. " +
+                            "Se asigna al guardar.",
+                        side: "bottom",
                     },
                 },
+
+                // ── Transición al paso 2 ──────────────────────────────────────
                 {
-                    element: "[data-tour='act-notas']",
                     popover: {
-                        title: "Paso 7: Notas (Opcional)",
+                        title: "Continuar al Paso 2",
                         description:
-                            "Si necesitas agregar informacion adicional, observaciones o comentarios sobre el acto, escribelos aqui.",
-                        side: "top",
+                            "Cuando hayas seleccionado la unidad, serie y subserie, " +
+                            "haz clic en el botón <strong>Siguiente →</strong> (parte inferior) " +
+                            "para ir al <strong>Paso 2: Detalle</strong>.",
                     },
                 },
+
+                // ── Paso 2: Detalle (popover general — campos ocultos en este momento) ──
                 {
-                    element: "[data-tour='act-adjuntos']",
                     popover: {
-                        title: "Paso 8: Archivos Adjuntos",
+                        title: "Paso 2 — Detalle del Acto",
                         description:
-                            "Sube los documentos PDF del acto administrativo. Puedes subir multiples archivos <strong>(maximo 20MB cada uno)</strong>. Los archivos quedan disponibles para descarga y consulta.",
-                        side: "top",
+                            "<strong>Objeto / Asunto</strong> (obligatorio): describe brevemente " +
+                            "de qué trata el acto. Ejemplo: <em>'Por la cual se reglamenta el proceso de...'</em><br><br>" +
+                            "<strong>Notas</strong> (opcional): observaciones o información adicional " +
+                            "sobre el acto administrativo.",
                     },
                 },
+
+                // ── Paso 3: Documentos (popover general — campos ocultos en este momento) ──
                 {
-                    element: "[data-tour='act-folios']",
                     popover: {
-                        title: "Folios",
+                        title: "Paso 3 — Documentos Adjuntos",
                         description:
-                            "Al subir archivos PDF, se calculará <strong>automaticamente</strong> el numero total de folios de los documentos.",
-                        side: "top",
+                            "Sube los <strong>documentos PDF</strong> del acto (opcional). " +
+                            "Puedes adjuntar varios archivos, máximo <strong>20 MB</strong> cada uno. " +
+                            "El sistema calcula automáticamente el número de folios a partir de los PDF.<br><br>" +
+                            "Cuando termines, haz clic en <strong>Guardar</strong> para registrar el acto.",
                     },
                 },
-                {
-                    element: ".fi-form-actions",
-                    popover: {
-                        title: "Paso 9: Guardar",
-                        description:
-                            "Cuando hayas completado toda la informacion, haz clic en 'Crear' para guardar el acto administrativo en el sistema.",
-                        side: "top",
-                    },
-                },
+
+                // ── Botón de ayuda ────────────────────────────────────────────
                 {
                     element: "[data-tour='help-button-acts-create']",
                     popover: {
                         title: "¿Necesitas ayuda?",
                         description:
-                            "Puedes ver este tutorial de nuevo en cualquier momento haciendo clic aqui.",
+                            "Puedes ver este tutorial nuevamente en cualquier momento haciendo clic aquí.",
                         side: "bottom",
                     },
                 },
+
+                // ── Cierre ────────────────────────────────────────────────────
                 {
                     popover: {
-                        title: "¡YA ESTÁS LISTO!",
+                        title: "¡Ya estás listo!",
                         description:
-                            "Completa los datos y el acto administrativo quedara registrado. Recuerda que puedes editarlo despues si necesitas hacer cambios.",
+                            "Completa los 3 pasos y haz clic en <strong>Guardar</strong>. " +
+                            "El acto quedará registrado con su consecutivo único y podrás editarlo después si es necesario.",
                     },
                 },
             ],
