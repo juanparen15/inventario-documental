@@ -24,6 +24,7 @@ class AdministrativeAct extends Model
         'subject',
         'attachments',
         'folios',
+        'pdf_notified_days',
         'slug',
         'notes',
         'created_by',
@@ -31,9 +32,22 @@ class AdministrativeAct extends Model
     ];
 
     protected $casts = [
-        'vigencia' => 'integer',
-        'attachments' => 'array',
+        'vigencia'          => 'integer',
+        'attachments'       => 'array',
+        'pdf_notified_days' => 'array',
     ];
+
+    /** Días restantes hasta el límite de 30 días para subir PDF (negativo = vencido). */
+    public function pdfDaysRemaining(): int
+    {
+        return 30 - (int) $this->created_at->diffInDays(now());
+    }
+
+    /** True si el acto no tiene PDF adjunto. */
+    public function lacksPdf(): bool
+    {
+        return empty($this->attachments);
+    }
 
     protected static function boot(): void
     {

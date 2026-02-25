@@ -67,6 +67,14 @@ class AdministrativeActResource extends Resource
                             })
                             ->extraAttributes(['data-tour' => 'act-unidad']),
 
+                        Forms\Components\Placeholder::make('entity_display')
+                            ->label('Entidad')
+                            ->content(function (Get $get, ?AdministrativeAct $record) {
+                                $unitId = $get('organizational_unit_id') ?? $record?->organizational_unit_id;
+                                if (! $unitId) return '—';
+                                return OrganizationalUnit::with('entity')->find($unitId)?->entity?->name ?? '—';
+                            }),
+
                         Forms\Components\Placeholder::make('vigencia_display')
                             ->label('Vigencia')
                             ->content(fn(?AdministrativeAct $record) => $record?->vigencia ?? date('Y'))
@@ -306,12 +314,45 @@ class AdministrativeActResource extends Resource
                     )
                     ->toggleable(),
 
+                Tables\Columns\TextColumn::make('organizationalUnit.entity.name')
+                    ->label('Entidad')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable()
+                    ->visible(fn() => auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
+
                 Tables\Columns\TextColumn::make('organizationalUnit.name')
                     ->label('Unidad')
                     ->searchable()
                     ->sortable()
                     ->toggleable()
-                    ->visible(fn() => auth()->user()?->hasRole('super_admin')),
+                    ->visible(fn() => auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
+
+                Tables\Columns\TextColumn::make('pdf_days_remaining')
+                    ->label('Días para PDF')
+                    ->getStateUsing(function (AdministrativeAct $record): string {
+                        if (! $record->lacksPdf()) {
+                            return '✓';
+                        }
+                        $days = $record->pdfDaysRemaining();
+                        if ($days < 0) {
+                            return 'Vencido (' . abs($days) . 'd)';
+                        }
+                        return $days . ' días';
+                    })
+                    ->badge()
+                    ->color(function (AdministrativeAct $record): string {
+                        if (! $record->lacksPdf()) {
+                            return 'success';
+                        }
+                        $days = $record->pdfDaysRemaining();
+                        if ($days < 0) return 'danger';
+                        if ($days <= 5) return 'danger';
+                        if ($days <= 15) return 'warning';
+                        return 'info';
+                    })
+                    ->sortable(false)
+                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('creator.name')
                     ->label('Creado por')
