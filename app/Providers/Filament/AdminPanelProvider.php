@@ -64,6 +64,11 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Pages\ImportErrors::class,
                 \App\Filament\Pages\MonthlyReportPage::class,
             ])
+            ->authenticatedRoutes(function (\Filament\Panel $panel): void {
+                // Registro explícito: authenticatedRoutes() no verifica el caché de componentes,
+                // garantizando que la ruta exista independientemente del estado del caché.
+                \App\Filament\Pages\MonthlyReportPage::registerRoutes($panel);
+            })
             ->userMenuItems([
                 'cambiar-password' => \Filament\Navigation\MenuItem::make()
                     ->label('Cambiar Contraseña')
