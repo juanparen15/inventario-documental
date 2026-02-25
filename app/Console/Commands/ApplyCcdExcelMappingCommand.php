@@ -10,34 +10,34 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Aplica el mapeo exacto del Cuadro de Clasificación Documental (Excel "Implementar"):
+ * Resetea todas las ccd_entries de series CCD y recrea SOLO las combinaciones
+ * definidas en el Excel "Series_V1 - ERIKA.xlsx", hoja "Implementar".
  *
- * Solo DA tiene Decretos (serie 03, subserie 03).
- * Todas las 10 dependencias tienen Circulares y Resoluciones (serie 03).
- * Todas las 10 dependencias tienen Comunicaciones Externas e Internas (serie 24).
+ * Las entradas de series FUID no se tocan (InventoryRecord las usa con context='fuid').
+ *
+ * Mapeo exacto:
+ *   DA   → 03 (Circulares, Decretos, Resoluciones) + 24 (Com.Ext, Com.Int)
+ *   Demás 9 dependencias → 03 (Circulares, Resoluciones) + 24 (Com.Ext, Com.Int)
  */
 class ApplyCcdExcelMappingCommand extends Command
 {
     protected $signature = 'ccd:apply-excel-mapping
                             {--dry-run : Muestra los cambios sin guardarlos}';
 
-    protected $description = 'Aplica el mapeo exacto del Excel CCD para series 03 y 24 en las 10 dependencias principales';
+    protected $description = 'Resetea ccd_entries CCD y aplica el mapeo exacto del Excel (series 03 y 24, 10 dependencias)';
 
-    /**
-     * Mapeo exacto del Excel (hoja "Implementar"):
-     * codUnidad => [codSerie => [codSubserie, ...]]
-     */
+    /** Mapeo exacto del Excel: codUnidad => [codSerie => [codSubserie, ...]] */
     private array $mapping = [
-        'DA'   => ['03' => ['02', '03', '04'], '24' => ['01', '02']], // DA tiene Circulares, Decretos, Resoluciones
-        'SGA'  => ['03' => ['02', '04'],       '24' => ['01', '02']], // Sin Decretos
-        'SGCC' => ['03' => ['02', '04'],       '24' => ['01', '02']],
-        'SH'   => ['03' => ['02', '04'],       '24' => ['01', '02']],
-        'SP'   => ['03' => ['02', '04'],       '24' => ['01', '02']],
-        'SOP'  => ['03' => ['02', '04'],       '24' => ['01', '02']],
-        'SDSC' => ['03' => ['02', '04'],       '24' => ['01', '02']],
-        'CI'   => ['03' => ['02', '04'],       '24' => ['01', '02']],
-        'UMATA'=> ['03' => ['02', '04'],       '24' => ['01', '02']],
-        'ITT'  => ['03' => ['02', '04'],       '24' => ['01', '02']],
+        'DA'    => ['03' => ['02', '03', '04'], '24' => ['01', '02']],
+        'SGA'   => ['03' => ['02', '04'],       '24' => ['01', '02']],
+        'SGCC'  => ['03' => ['02', '04'],       '24' => ['01', '02']],
+        'SH'    => ['03' => ['02', '04'],       '24' => ['01', '02']],
+        'SP'    => ['03' => ['02', '04'],       '24' => ['01', '02']],
+        'SOP'   => ['03' => ['02', '04'],       '24' => ['01', '02']],
+        'SDSC'  => ['03' => ['02', '04'],       '24' => ['01', '02']],
+        'CI'    => ['03' => ['02', '04'],       '24' => ['01', '02']],
+        'UMATA' => ['03' => ['02', '04'],       '24' => ['01', '02']],
+        'ITT'   => ['03' => ['02', '04'],       '24' => ['01', '02']],
     ];
 
     public function handle(): int
@@ -48,58 +48,49 @@ class ApplyCcdExcelMappingCommand extends Command
             $this->warn('Modo dry-run: no se guardarán cambios.');
         }
 
-        // Cargar modelos necesarios
-        $series = DocumentarySeries::ccd()
+        // ── Cargar series CCD (todas, para el reset global) ───────────────
+        $allCcdSeriesIds = DocumentarySeries::ccd()->pluck('id');
+
+        if ($allCcdSeriesIds->isEmpty()) {
+            $this->error('No se encontraron series CCD en la base de datos.');
+            return self::FAILURE;
+        }
+
+        // ── Cargar las 2 series del Excel y sus subseries ─────────────────
+        $excelSeries = DocumentarySeries::ccd()
             ->whereIn('code', ['03', '24'])
             ->get()
             ->keyBy('code');
 
-        if ($series->count() < 2) {
+        if ($excelSeries->count() < 2) {
             $this->error('No se encontraron las series 03 y/o 24 en contexto CCD.');
             return self::FAILURE;
         }
 
         $subseries = DocumentarySubseries::ccd()
-            ->whereIn('documentary_series_id', $series->pluck('id'))
+            ->whereIn('documentary_series_id', $excelSeries->pluck('id'))
             ->get()
-            ->groupBy('documentary_series_id'); // [serie_id => Collection<Subserie>]
+            ->groupBy('documentary_series_id');
 
         $units = OrganizationalUnit::whereIn('code', array_keys($this->mapping))
             ->whereNull('deleted_at')
             ->get()
             ->keyBy('code');
 
-        $created = 0;
-        $deleted = 0;
-        $skipped = 0;
-
         DB::beginTransaction();
 
         try {
-            // ── Paso 0: eliminar entradas de SUBSERIES de unidades fuera del Excel ─
-            // Solo se tocan entradas con subserie (documentary_subseries_id IS NOT NULL).
-            // Las entradas sin subserie (que controlan si la serie aparece en el select)
-            // se dejan intactas para que todas las unidades sigan viendo las series.
-            $allowedUnitIds = $units->pluck('id');
+            // ── PASO 1: eliminar TODAS las ccd_entries de series CCD ──────
+            $totalToDelete = CcdEntry::whereIn('documentary_series_id', $allCcdSeriesIds)->count();
+            $this->info("Eliminando {$totalToDelete} entradas CCD existentes...");
 
-            foreach ($series as $serie) {
-                $outsiders = CcdEntry::where('documentary_series_id', $serie->id)
-                    ->whereNotNull('documentary_subseries_id')          // solo nivel subserie
-                    ->whereNotIn('organizational_unit_id', $allowedUnitIds)
-                    ->get();
-
-                foreach ($outsiders as $entry) {
-                    $unitCode = OrganizationalUnit::withTrashed()->find($entry->organizational_unit_id)?->code ?? "id={$entry->organizational_unit_id}";
-                    $subCode  = $subseries->get($serie->id, collect())->firstWhere('id', $entry->documentary_subseries_id)?->code ?? '?';
-                    $this->line("  <fg=red>ELIMINAR</> {$unitCode} | serie {$serie->code} | sub {$subCode}  [unidad no está en Excel]");
-                    if (! $dryRun) {
-                        $entry->delete();
-                    }
-                    $deleted++;
-                }
+            if (! $dryRun) {
+                CcdEntry::whereIn('documentary_series_id', $allCcdSeriesIds)->delete();
             }
 
-            // ── Paso 1: ajustar entradas de las 10 unidades del Excel ────────
+            // ── PASO 2: crear SOLO las entradas del Excel ─────────────────
+            $created = 0;
+
             foreach ($this->mapping as $unitCode => $seriesMap) {
                 $unit = $units->get($unitCode);
                 if (! $unit) {
@@ -108,7 +99,7 @@ class ApplyCcdExcelMappingCommand extends Command
                 }
 
                 foreach ($seriesMap as $serieCode => $allowedSubCodes) {
-                    $serie = $series->get($serieCode);
+                    $serie = $excelSeries->get($serieCode);
                     if (! $serie) {
                         $this->warn("  Serie '{$serieCode}' no encontrada, se omite.");
                         continue;
@@ -116,56 +107,32 @@ class ApplyCcdExcelMappingCommand extends Command
 
                     $allSubsOfSerie = $subseries->get($serie->id, collect());
 
-                    // IDs de subseries permitidas para esta unidad+serie
-                    $allowedSubIds = $allSubsOfSerie
-                        ->whereIn('code', $allowedSubCodes)
-                        ->pluck('id');
+                    // Entrada nivel-serie (sin subserie) — hace que la serie
+                    // aparezca en el select del formulario de actos administrativos
+                    $this->line("  <fg=green>CREAR</> {$unitCode} | serie {$serieCode} | (nivel serie)");
+                    if (! $dryRun) {
+                        CcdEntry::create([
+                            'organizational_unit_id'   => $unit->id,
+                            'documentary_series_id'    => $serie->id,
+                            'documentary_subseries_id' => null,
+                        ]);
+                    }
+                    $created++;
 
-                    // IDs de todas las subseries de esta serie
-                    $allSubIds = $allSubsOfSerie->pluck('id');
+                    // Entradas de subseries permitidas
+                    $allowedSubs = $allSubsOfSerie->whereIn('code', $allowedSubCodes);
 
-                    // ── Eliminar subseries NO permitidas para esta unidad ─────
-                    $toDelete = CcdEntry::where('organizational_unit_id', $unit->id)
-                        ->where('documentary_series_id', $serie->id)
-                        ->whereNotNull('documentary_subseries_id')   // nunca tocar nivel serie
-                        ->whereNotIn('documentary_subseries_id', $allowedSubIds)
-                        ->get();
-
-                    foreach ($toDelete as $entry) {
-                        $subCode = $allSubsOfSerie->firstWhere('id', $entry->documentary_subseries_id)?->code ?? '?';
-                        $this->line("  <fg=red>ELIMINAR</> {$unitCode} | serie {$serieCode} | sub {$subCode}");
+                    foreach ($allowedSubs as $sub) {
+                        $this->line("  <fg=green>CREAR</> {$unitCode} | serie {$serieCode} | sub {$sub->code} - {$sub->name}");
                         if (! $dryRun) {
-                            $entry->delete();
+                            CcdEntry::create([
+                                'organizational_unit_id'   => $unit->id,
+                                'documentary_series_id'    => $serie->id,
+                                'documentary_subseries_id' => $sub->id,
+                            ]);
                         }
-                        $deleted++;
+                        $created++;
                     }
-
-                    // ── Crear entradas faltantes ──────────────────────────────
-                    foreach ($allowedSubIds as $subId) {
-                        $exists = CcdEntry::where('organizational_unit_id', $unit->id)
-                            ->where('documentary_series_id', $serie->id)
-                            ->where('documentary_subseries_id', $subId)
-                            ->exists();
-
-                        if (! $exists) {
-                            $subCode = $allSubsOfSerie->firstWhere('id', $subId)?->code ?? '?';
-                            $this->line("  <fg=green>CREAR</> {$unitCode} | serie {$serieCode} | sub {$subCode}");
-                            if (! $dryRun) {
-                                CcdEntry::create([
-                                    'organizational_unit_id'   => $unit->id,
-                                    'documentary_series_id'    => $serie->id,
-                                    'documentary_subseries_id' => $subId,
-                                ]);
-                            }
-                            $created++;
-                        } else {
-                            $skipped++;
-                        }
-                    }
-
-                    // La entrada nivel-serie (subseries_id=null) no se toca:
-                    // ya existe para todas las unidades y controla la visibilidad
-                    // de la serie en el select del formulario de actos administrativos.
                 }
             }
 
@@ -182,7 +149,7 @@ class ApplyCcdExcelMappingCommand extends Command
         }
 
         $this->newLine();
-        $this->info("Completado: {$created} creadas | {$deleted} eliminadas | {$skipped} ya correctas.");
+        $this->info("Completado: {$totalToDelete} entradas CCD eliminadas | {$created} entradas del Excel creadas.");
 
         return self::SUCCESS;
     }
