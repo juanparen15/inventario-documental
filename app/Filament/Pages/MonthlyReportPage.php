@@ -23,6 +23,7 @@ class MonthlyReportPage extends Page
     protected static ?string $navigationGroup = 'Inventario';
     protected static ?string $title           = 'Informe Mensual de Actos Administrativos';
     protected static ?int    $navigationSort  = 10;
+    protected static string  $slug            = 'monthly-report';
 
     protected static string $view = 'filament.pages.monthly-report';
 
