@@ -58,9 +58,11 @@ class AdminPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop()
             ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
-                // Dashboard auto-discovered from app/Filament/Pages/Dashboard.php
+                \App\Filament\Pages\Dashboard::class,
+                \App\Filament\Pages\CambiarPassword::class,
+                \App\Filament\Pages\ImportErrors::class,
+                \App\Filament\Pages\MonthlyReportPage::class,
             ])
             ->userMenuItems([
                 'cambiar-password' => \Filament\Navigation\MenuItem::make()
