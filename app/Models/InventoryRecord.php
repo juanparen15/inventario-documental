@@ -65,7 +65,7 @@ class InventoryRecord extends Model
         'end_date' => 'date',
         'has_start_date' => 'boolean',
         'has_end_date' => 'boolean',
-        'folios' => 'integer',
+        'folios' => 'string',
         'storage_unit_quantity' => 'integer',
         'attachments' => 'array',
     ];

@@ -272,10 +272,9 @@ class InventoryRecordResource extends Resource
 
                         Forms\Components\TextInput::make('folios')
                             ->label('No. Folios')
-                            ->helperText('Rango de folios en papel')
+                            ->helperText('Rango de folios en papel. Ej: 1-200 ó 200-300')
                             ->required()
-                            ->numeric()
-                            ->minValue(0),
+                            ->maxLength(50),
                     ]),
 
                 // SECCION 6: Soporte
