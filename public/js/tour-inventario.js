@@ -448,99 +448,102 @@ document.addEventListener("DOMContentLoaded", function () {
                     popover: {
                         title: "Registrar un Acto Administrativo",
                         description:
-                            "El formulario está dividido en <strong>3 pasos</strong>:<br><br>" +
-                            "1. <strong>Clasificación</strong> — dependencia y tipo de acto<br>" +
-                            "2. <strong>Detalle</strong> — objeto y notas<br>" +
-                            "3. <strong>Documentos</strong> — archivos PDF adjuntos<br><br>" +
+                            "El formulario tiene <strong>3 pasos</strong>. " +
+                            "Los tabs de arriba indican en cuál estás. " +
                             "Completa cada paso y haz clic en <em>Siguiente</em> para avanzar.",
                     },
                 },
 
-                // ── Paso 1: Clasificación (elementos visibles al cargar) ──────
+                // ── Tab del paso 1 ────────────────────────────────────────────
+                {
+                    element: ".fi-fo-wizard-header-step:nth-child(1)",
+                    popover: {
+                        title: "Paso 1 — Clasificación",
+                        description:
+                            "Aquí seleccionas la <strong>dependencia</strong>, la <strong>serie</strong> " +
+                            "y la <strong>subserie</strong> que clasifican el acto según el CCD. " +
+                            "El consecutivo se genera automáticamente.",
+                        side: "bottom",
+                    },
+                },
+
+                // ── Campos del paso 1 ─────────────────────────────────────────
                 {
                     element: "[data-tour='act-unidad']",
                     popover: {
-                        title: "Paso 1 — Unidad Organizacional",
+                        title: "Unidad Organizacional",
                         description:
                             "Selecciona la dependencia que registra el acto. " +
                             "Si eres usuario normal, ya aparece seleccionada tu unidad automáticamente.",
-                        side: "right",
+                        side: "bottom",
                     },
                 },
                 {
                     element: "[data-tour='act-vigencia']",
                     popover: {
-                        title: "Paso 1 — Vigencia",
+                        title: "Vigencia",
                         description:
-                            "Año al que corresponde el acto administrativo. " +
+                            "Año al que corresponde el acto. " +
                             "Se usa para generar el consecutivo y para filtrar registros por año.",
-                        side: "right",
+                        side: "bottom",
                     },
                 },
                 {
                     element: "[data-tour='act-serie']",
                     popover: {
-                        title: "Paso 1 — Serie Documental",
+                        title: "Serie Documental",
                         description:
                             "Selecciona la serie según el CCD. Ejemplo: " +
                             "<em>03 - Actos Administrativos</em> o <em>24 - Comunicaciones Oficiales</em>.",
-                        side: "right",
+                        side: "bottom",
                     },
                 },
                 {
                     element: "[data-tour='act-subserie']",
                     popover: {
-                        title: "Paso 1 — Subserie Documental",
+                        title: "Subserie Documental",
                         description:
                             "Selecciona la subserie: Resoluciones, Decretos, Circulares, " +
                             "Comunicaciones Externas o Internas. Las opciones dependen de la serie elegida.",
-                        side: "right",
+                        side: "bottom",
                     },
                 },
                 {
                     element: "[data-tour='act-consecutivo']",
                     popover: {
-                        title: "Paso 1 — Consecutivo (automático)",
+                        title: "Consecutivo (automático)",
                         description:
-                            "El sistema genera el número de consecutivo automáticamente con el formato " +
-                            "<strong>2026.DA.03.02.001</strong>. No debes escribirlo manualmente. " +
-                            "Se asigna al guardar.",
+                            "El sistema genera el número de consecutivo automáticamente. " +
+                            "Formato: <strong>2026.DA.03.02.001</strong>. " +
+                            "No debes escribirlo — se asigna al guardar.",
+                        side: "top",
+                    },
+                },
+
+                // ── Tab del paso 2 ────────────────────────────────────────────
+                {
+                    element: ".fi-fo-wizard-header-step:nth-child(2)",
+                    popover: {
+                        title: "Paso 2 — Detalle",
+                        description:
+                            "Al hacer clic en <strong>Siguiente</strong> llegarás a este paso. " +
+                            "Aquí escribes el <strong>Objeto / Asunto</strong> del acto (obligatorio) " +
+                            "y las <strong>Notas</strong> adicionales (opcional).",
                         side: "bottom",
                     },
                 },
 
-                // ── Transición al paso 2 ──────────────────────────────────────
+                // ── Tab del paso 3 ────────────────────────────────────────────
                 {
+                    element: ".fi-fo-wizard-header-step:nth-child(3)",
                     popover: {
-                        title: "Continuar al Paso 2",
+                        title: "Paso 3 — Documentos",
                         description:
-                            "Cuando hayas seleccionado la unidad, serie y subserie, " +
-                            "haz clic en el botón <strong>Siguiente →</strong> (parte inferior) " +
-                            "para ir al <strong>Paso 2: Detalle</strong>.",
-                    },
-                },
-
-                // ── Paso 2: Detalle (popover general — campos ocultos en este momento) ──
-                {
-                    popover: {
-                        title: "Paso 2 — Detalle del Acto",
-                        description:
-                            "<strong>Objeto / Asunto</strong> (obligatorio): describe brevemente " +
-                            "de qué trata el acto. Ejemplo: <em>'Por la cual se reglamenta el proceso de...'</em><br><br>" +
-                            "<strong>Notas</strong> (opcional): observaciones o información adicional " +
-                            "sobre el acto administrativo.",
-                    },
-                },
-
-                // ── Paso 3: Documentos (popover general — campos ocultos en este momento) ──
-                {
-                    popover: {
-                        title: "Paso 3 — Documentos Adjuntos",
-                        description:
-                            "Sube los <strong>documentos PDF</strong> del acto (opcional). " +
-                            "Puedes adjuntar varios archivos, máximo <strong>20 MB</strong> cada uno. " +
-                            "El sistema calcula automáticamente el número de folios a partir de los PDF.<br><br>" +
-                            "Cuando termines, haz clic en <strong>Guardar</strong> para registrar el acto.",
+                            "En el último paso puedes adjuntar los <strong>documentos PDF</strong> " +
+                            "del acto (opcional, máximo 20 MB por archivo). " +
+                            "El sistema cuenta los folios automáticamente. " +
+                            "Aquí también está el botón <strong>Guardar</strong>.",
+                        side: "bottom",
                     },
                 },
 
@@ -561,7 +564,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         title: "¡Ya estás listo!",
                         description:
                             "Completa los 3 pasos y haz clic en <strong>Guardar</strong>. " +
-                            "El acto quedará registrado con su consecutivo único y podrás editarlo después si es necesario.",
+                            "El acto quedará registrado con su consecutivo único.",
                     },
                 },
             ],

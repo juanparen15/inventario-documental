@@ -56,11 +56,13 @@ class CreateAdministrativeAct extends CreateRecord
                         ->afterStateUpdated(function (Forms\Set $set) {
                             $set('documentary_series_id', null);
                             $set('documentary_subseries_id', null);
-                        }),
+                        })
+                        ->extraAttributes(['data-tour' => 'act-unidad']),
 
                     Forms\Components\Placeholder::make('vigencia_display')
                         ->label('Vigencia')
-                        ->content(fn () => date('Y')),
+                        ->content(fn () => date('Y'))
+                        ->extraAttributes(['data-tour' => 'act-vigencia']),
 
                     Forms\Components\Hidden::make('vigencia')
                         ->default(date('Y'))
@@ -94,7 +96,8 @@ class CreateAdministrativeAct extends CreateRecord
                         ->live()
                         ->afterStateUpdated(function (Forms\Set $set) {
                             $set('documentary_subseries_id', null);
-                        }),
+                        })
+                        ->extraAttributes(['data-tour' => 'act-serie']),
 
                     Forms\Components\Select::make('documentary_subseries_id')
                         ->label('Subserie Documental')
@@ -137,7 +140,8 @@ class CreateAdministrativeAct extends CreateRecord
                                 ->where('documentary_series_id', $seriesId)
                                 ->whereNotNull('documentary_subseries_id')
                                 ->exists();
-                        }),
+                        })
+                        ->extraAttributes(['data-tour' => 'act-subserie']),
 
                     Forms\Components\Placeholder::make('filing_number_preview')
                         ->label('Consecutivo (automático)')
@@ -150,6 +154,7 @@ class CreateAdministrativeAct extends CreateRecord
                             );
                             return $preview ?? 'Seleccione unidad y serie para generar';
                         })
+                        ->extraAttributes(['data-tour' => 'act-consecutivo'])
                         ->columnSpanFull(),
                 ]),
 
@@ -163,11 +168,13 @@ class CreateAdministrativeAct extends CreateRecord
                         ->label('Objeto / Asunto')
                         ->required()
                         ->maxLength(1000)
+                        ->extraAttributes(['data-tour' => 'act-asunto'])
                         ->columnSpanFull(),
 
                     Forms\Components\Textarea::make('notes')
                         ->label('Notas')
                         ->rows(4)
+                        ->extraAttributes(['data-tour' => 'act-notas'])
                         ->columnSpanFull(),
                 ]),
 
@@ -187,6 +194,7 @@ class CreateAdministrativeAct extends CreateRecord
                         ->openable()
                         ->reorderable()
                         ->live()
+                        ->extraAttributes(['data-tour' => 'act-adjuntos'])
                         ->columnSpanFull(),
 
                     Forms\Components\Placeholder::make('folios_display')
@@ -215,6 +223,7 @@ class CreateAdministrativeAct extends CreateRecord
                             return count($files) . ' archivo(s) adjunto(s)';
                         })
                         ->helperText('Calculado automáticamente a partir de los PDF adjuntos.')
+                        ->extraAttributes(['data-tour' => 'act-folios'])
                         ->columnSpanFull(),
                 ]),
         ];
