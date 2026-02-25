@@ -76,20 +76,21 @@ class ApplyCcdExcelMappingCommand extends Command
         DB::beginTransaction();
 
         try {
-            // ── Paso 0: eliminar acceso de unidades NO incluidas en el Excel ─
-            // Para las series 03 y 24, solo las 10 dependencias del Excel deben tener entradas.
+            // ── Paso 0: eliminar entradas de SUBSERIES de unidades fuera del Excel ─
+            // Solo se tocan entradas con subserie (documentary_subseries_id IS NOT NULL).
+            // Las entradas sin subserie (que controlan si la serie aparece en el select)
+            // se dejan intactas para que todas las unidades sigan viendo las series.
             $allowedUnitIds = $units->pluck('id');
 
             foreach ($series as $serie) {
                 $outsiders = CcdEntry::where('documentary_series_id', $serie->id)
+                    ->whereNotNull('documentary_subseries_id')          // solo nivel subserie
                     ->whereNotIn('organizational_unit_id', $allowedUnitIds)
                     ->get();
 
                 foreach ($outsiders as $entry) {
                     $unitCode = OrganizationalUnit::withTrashed()->find($entry->organizational_unit_id)?->code ?? "id={$entry->organizational_unit_id}";
-                    $subCode  = $entry->documentary_subseries_id
-                        ? ($subseries->get($serie->id, collect())->firstWhere('id', $entry->documentary_subseries_id)?->code ?? '?')
-                        : '(sin sub)';
+                    $subCode  = $subseries->get($serie->id, collect())->firstWhere('id', $entry->documentary_subseries_id)?->code ?? '?';
                     $this->line("  <fg=red>ELIMINAR</> {$unitCode} | serie {$serie->code} | sub {$subCode}  [unidad no está en Excel]");
                     if (! $dryRun) {
                         $entry->delete();
@@ -123,10 +124,10 @@ class ApplyCcdExcelMappingCommand extends Command
                     // IDs de todas las subseries de esta serie
                     $allSubIds = $allSubsOfSerie->pluck('id');
 
-                    // ── Eliminar entradas de subseries NO permitidas ──────────
+                    // ── Eliminar subseries NO permitidas para esta unidad ─────
                     $toDelete = CcdEntry::where('organizational_unit_id', $unit->id)
                         ->where('documentary_series_id', $serie->id)
-                        ->whereNotNull('documentary_subseries_id')
+                        ->whereNotNull('documentary_subseries_id')   // nunca tocar nivel serie
                         ->whereNotIn('documentary_subseries_id', $allowedSubIds)
                         ->get();
 
@@ -162,23 +163,9 @@ class ApplyCcdExcelMappingCommand extends Command
                         }
                     }
 
-                    // ── Asegurar la entrada de la serie sin subserie ──────────
-                    $serieEntry = CcdEntry::where('organizational_unit_id', $unit->id)
-                        ->where('documentary_series_id', $serie->id)
-                        ->whereNull('documentary_subseries_id')
-                        ->exists();
-
-                    if (! $serieEntry) {
-                        $this->line("  <fg=green>CREAR</> {$unitCode} | serie {$serieCode} | (sin subserie)");
-                        if (! $dryRun) {
-                            CcdEntry::create([
-                                'organizational_unit_id'   => $unit->id,
-                                'documentary_series_id'    => $serie->id,
-                                'documentary_subseries_id' => null,
-                            ]);
-                        }
-                        $created++;
-                    }
+                    // La entrada nivel-serie (subseries_id=null) no se toca:
+                    // ya existe para todas las unidades y controla la visibilidad
+                    // de la serie en el select del formulario de actos administrativos.
                 }
             }
 
