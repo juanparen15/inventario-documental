@@ -7,7 +7,6 @@ use App\Models\AdministrativeAct;
 use App\Models\CcdEntry;
 use App\Models\DocumentarySeries;
 use App\Models\DocumentarySubseries;
-use App\Models\Entity;
 use App\Models\OrganizationalUnit;
 use Filament\Actions\Action;
 use Filament\Forms;
@@ -59,14 +58,6 @@ class CreateAdministrativeAct extends CreateRecord
                             $set('documentary_subseries_id', null);
                         })
                         ->extraAttributes(['data-tour' => 'act-unidad']),
-
-                    Forms\Components\Placeholder::make('entity_display')
-                        ->label('Entidad')
-                        ->content(function (Get $get) {
-                            $unitId = $get('organizational_unit_id');
-                            if (! $unitId) return '—';
-                            return OrganizationalUnit::with('entity')->find($unitId)?->entity?->name ?? '—';
-                        }),
 
                     Forms\Components\Placeholder::make('vigencia_display')
                         ->label('Vigencia')
