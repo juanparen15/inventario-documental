@@ -35,6 +35,11 @@ class MonthlyReportPage extends Page
         return auth()->user()?->hasAnyRole(['super_admin', 'supervisor']) ?? false;
     }
 
+    public static function getNavigationUrl(): string
+    {
+        return url('/admin/monthly-report');
+    }
+
     public function mount(): void
     {
         $this->selectedMonth = (int) Carbon::now()->month;

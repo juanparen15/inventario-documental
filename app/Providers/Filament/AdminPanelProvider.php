@@ -64,10 +64,17 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Pages\ImportErrors::class,
                 \App\Filament\Pages\MonthlyReportPage::class,
             ])
-            ->authenticatedRoutes(function (\Filament\Panel $panel): void {
-                // Registro explícito: authenticatedRoutes() no verifica el caché de componentes,
-                // garantizando que la ruta exista independientemente del estado del caché.
-                \App\Filament\Pages\MonthlyReportPage::registerRoutes($panel);
+            ->authenticatedRoutes(function (): void {
+                // Registro con string literal para evitar carga de clase en tiempo de boot.
+                // Resuelve RouteNotFoundException causado por OPcache o caché de Filament
+                // que impide que el loop de páginas registre esta ruta correctamente.
+                \Illuminate\Support\Facades\Route::name('pages.')
+                    ->group(function (): void {
+                        \Illuminate\Support\Facades\Route::get(
+                            '/monthly-report',
+                            \App\Filament\Pages\MonthlyReportPage::class
+                        )->name('monthly-report');
+                    });
             })
             ->userMenuItems([
                 'cambiar-password' => \Filament\Navigation\MenuItem::make()
