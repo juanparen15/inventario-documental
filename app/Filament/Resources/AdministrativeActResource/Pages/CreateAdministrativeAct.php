@@ -8,7 +8,6 @@ use App\Models\CcdEntry;
 use App\Models\DocumentarySeries;
 use App\Models\DocumentarySubseries;
 use App\Models\OrganizationalUnit;
-use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Get;
 use Filament\Forms\Components\Wizard\Step;
@@ -265,15 +264,6 @@ class CreateAdministrativeAct extends CreateRecord
 
     protected function getHeaderActions(): array
     {
-        return [
-            Action::make('tutorial')
-                ->label('¿Cómo funciona?')
-                ->icon('heroicon-o-question-mark-circle')
-                ->color('gray')
-                ->extraAttributes([
-                    'data-tour'  => 'help-button-acts-create',
-                    'onclick'    => 'window.iniciarTour(); return false;',
-                ]),
-        ];
+        return [];
     }
 }
