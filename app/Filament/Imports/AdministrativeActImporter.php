@@ -287,7 +287,7 @@ class AdministrativeActImporter
                 $v->setType(DataValidation::TYPE_LIST);
                 $v->setErrorStyle(DataValidation::STYLE_STOP);
                 $v->setAllowBlank(false);
-                $v->setShowDropDown(false);
+                $v->setShowDropDown(true);    // true→XML showDropDown="0"→Excel MUESTRA la flecha ▼
                 $v->setShowErrorMessage(true);
                 $v->setShowInputMessage(true);
                 $v->setPromptTitle('Serie Documental');
@@ -303,7 +303,7 @@ class AdministrativeActImporter
                 $v->setType(DataValidation::TYPE_LIST);
                 $v->setErrorStyle(DataValidation::STYLE_INFORMATION);
                 $v->setAllowBlank(true);
-                $v->setShowDropDown(false);
+                $v->setShowDropDown(true);    // true→XML showDropDown="0"→Excel MUESTRA la flecha ▼
                 $v->setShowErrorMessage(true);
                 $v->setShowInputMessage(true);
                 $v->setPromptTitle('Subserie Documental');
