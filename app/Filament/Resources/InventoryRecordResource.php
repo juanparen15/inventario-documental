@@ -23,7 +23,7 @@ class InventoryRecordResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
 
-    protected static ?string $navigationGroup = 'Documentos';
+    protected static ?string $navigationGroup = 'Inventario Documental';
 
     protected static ?string $modelLabel = 'Registro de Inventario';
 
