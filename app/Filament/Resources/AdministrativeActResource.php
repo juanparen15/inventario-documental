@@ -25,6 +25,8 @@ class AdministrativeActResource extends Resource
 
     protected static ?string $navigationGroup = 'Inventario';
 
+    protected static ?string $navigationLabel = 'Sistema unificado de registro';
+
     protected static ?string $modelLabel = 'Acto Administrativo';
 
     protected static ?string $pluralModelLabel = 'Actos Administrativos';
