@@ -20,7 +20,7 @@ class MonthlyReportPage extends Page
 {
     protected static ?string $navigationIcon  = 'heroicon-o-chart-bar';
     protected static ?string $navigationLabel = 'Informe Mensual';
-    protected static ?string $navigationGroup = 'Inventario';
+    protected static ?string $navigationGroup = 'Documentos';
     protected static ?string $title           = 'Informe Mensual de Actos Administrativos';
     protected static ?int    $navigationSort  = 10;
     protected static ?string $slug             = 'monthly-report';

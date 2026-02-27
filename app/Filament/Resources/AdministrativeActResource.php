@@ -23,7 +23,7 @@ class AdministrativeActResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-document-check';
 
-    protected static ?string $navigationGroup = 'Inventario';
+    protected static ?string $navigationGroup = 'Documentos';
 
     protected static ?string $navigationLabel = 'Sistema unificado de registro';
 
