@@ -20,10 +20,12 @@ class OrganizationalUnit extends Model
         'slug',
         'entity_id',
         'is_active',
+        'can_import',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'is_active'  => 'boolean',
+        'can_import' => 'boolean',
     ];
 
     protected static function boot(): void

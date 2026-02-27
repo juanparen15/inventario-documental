@@ -41,12 +41,13 @@ class ListAdministrativeActs extends ListRecords
                 ->label('Descargar Plantilla')
                 ->icon('heroicon-o-document-arrow-down')
                 ->color('gray')
-                ->visible(fn() => auth()->user()?->hasRole('super_admin'))
+                ->visible(fn () => auth()->user()?->hasRole('super_admin') ||
+                                   auth()->user()?->organizationalUnit?->can_import)
                 ->extraAttributes([
                     'data-tour' => 'download-template-acts',
                 ])
                 ->action(function () {
-                    $spreadsheet = AdministrativeActImporter::generateTemplate();
+                    $spreadsheet = AdministrativeActImporter::generateTemplate(auth()->user());
                     $writer = new Xlsx($spreadsheet);
 
                     $fileName = 'plantilla_actos_administrativos_' . date('Y-m-d') . '.xlsx';
@@ -62,7 +63,8 @@ class ListAdministrativeActs extends ListRecords
                 ->label('Importar')
                 ->icon('heroicon-o-arrow-up-tray')
                 ->color('success')
-                ->visible(fn() => auth()->user()?->hasRole('super_admin'))
+                ->visible(fn () => auth()->user()?->hasRole('super_admin') ||
+                                   auth()->user()?->organizationalUnit?->can_import)
                 ->extraAttributes([
                     'data-tour' => 'import-button-acts',
                 ])
