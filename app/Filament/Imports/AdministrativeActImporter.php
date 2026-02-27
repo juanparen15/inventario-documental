@@ -3,13 +3,16 @@
 namespace App\Filament\Imports;
 
 use App\Models\AdministrativeAct;
+use App\Models\CcdEntry;
 use App\Models\DocumentarySeries;
 use App\Models\DocumentarySubseries;
 use App\Models\OrganizationalUnit;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\NamedRange;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -17,7 +20,7 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 class AdministrativeActImporter
 {
-    protected array $errors      = [];
+    protected array $errors       = [];
     protected int   $successCount = 0;
     protected int   $errorCount   = 0;
 
@@ -28,12 +31,13 @@ class AdministrativeActImporter
      *   Fila 2 — Encabezados de columnas  (ignorar al importar)
      *   Filas 3-102 — Datos
      *
-     *   A = Dependencia            (pre-llenada, bloqueada)
-     *   B = Serie Documental *     (obligatoria, desplegable)
-     *   C = Subserie Documental    (opcional, desplegable)
-     *   D = Año                    (pre-llenado, bloqueado)
+     *   A = Dependencia            (pre-llenada)
+     *   B = Serie Documental *     (obligatoria, desplegable filtrado por unidad)
+     *   C = Subserie Documental *  (obligatoria, desplegable dependiente de B)
+     *   D = Año                    (pre-llenado)
      *   E = Asunto / Descripción * (obligatorio, texto libre)
      *   F = Observaciones          (opcional, texto libre)
+     *   G = [columna oculta – fórmula helper para el desplegable dependiente]
      */
     public function import(string $filePath): array
     {
@@ -45,32 +49,56 @@ class AdministrativeActImporter
         array_shift($rows);
         array_shift($rows);
 
-        // Cachés de búsqueda
-        $organizationalUnits = OrganizationalUnit::where('is_active', true)->pluck('id', 'name')->toArray();
-
-        $seriesLookup = DocumentarySeries::where('is_active', true)
-            ->where('context', 'ccd')
-            ->get()
-            ->mapWithKeys(fn ($s) => ["{$s->code} - {$s->name}" => $s->id, $s->name => $s->id])
+        // ── Cachés de búsqueda ────────────────────────────────────────────
+        $organizationalUnits = OrganizationalUnit::where('is_active', true)
+            ->pluck('id', 'name')
             ->toArray();
 
-        $subseriesLookup = DocumentarySubseries::where('is_active', true)
-            ->where('context', 'ccd')
-            ->get()
-            ->mapWithKeys(fn ($s) => ["{$s->code} - {$s->name}" => $s->id, $s->name => $s->id])
-            ->toArray();
+        // Construir lookups desde ccd_entries para validar que la serie/subserie
+        // pertenece a la unidad indicada en cada fila.
+        //
+        // seriesAllowedByUnit[unitId][displayName] = seriesId
+        // subseriesAllowedBySeries[seriesId][displayName] = subseriesId
+        $ccdAll = CcdEntry::with([
+            'documentarySeries:id,code,name,is_active',
+            'documentarySubseries:id,code,name,is_active',
+        ])->get();
+
+        $seriesAllowedByUnit      = [];
+        $subseriesAllowedBySeries = [];
+
+        foreach ($ccdAll as $entry) {
+            $s = $entry->documentarySeries;
+            if (! $s || ! $s->is_active) {
+                continue;
+            }
+
+            $unitId   = $entry->organizational_unit_id;
+            $sDisplay = "{$s->code} - {$s->name}";
+
+            $seriesAllowedByUnit[$unitId][$sDisplay] = $s->id;
+            $seriesAllowedByUnit[$unitId][$s->name]  = $s->id;
+
+            $sub = $entry->documentarySubseries;
+            if ($sub && $sub->is_active) {
+                $subDisplay = "{$sub->code} - {$sub->name}";
+                $subseriesAllowedBySeries[$s->id][$subDisplay] = $sub->id;
+                $subseriesAllowedBySeries[$s->id][$sub->name]  = $sub->id;
+            }
+        }
 
         foreach ($rows as $index => $row) {
-            // +3 porque se saltaron 2 filas antes y las filas en Excel empiezan en 1
+            // +3 porque se saltaron 2 filas y las filas en Excel empiezan en 1
             $rowNumber = $index + 3;
 
-            // Saltar filas vacías
             if (empty(array_filter($row))) {
                 continue;
             }
 
             $rowErrors = [];
             $data      = [];
+            $unitId    = null;
+            $seriesId  = null;
 
             // Columna A — Dependencia (obligatoria)
             $orgUnitName = trim($row[0] ?? '');
@@ -79,27 +107,33 @@ class AdministrativeActImporter
             } elseif (! isset($organizationalUnits[$orgUnitName])) {
                 $rowErrors[] = "Columna A (Dependencia): '{$orgUnitName}' no existe en el sistema";
             } else {
-                $data['organizational_unit_id'] = $organizationalUnits[$orgUnitName];
+                $unitId                          = $organizationalUnits[$orgUnitName];
+                $data['organizational_unit_id']  = $unitId;
             }
 
-            // Columna B — Serie Documental (obligatoria)
-            $seriesName = trim($row[1] ?? '');
+            // Columna B — Serie Documental (obligatoria, validar contra ccd_entries)
+            $seriesName    = trim($row[1] ?? '');
+            $unitSeriesMap = $unitId ? ($seriesAllowedByUnit[$unitId] ?? []) : [];
+
             if (empty($seriesName)) {
                 $rowErrors[] = 'Columna B (Serie Documental): es requerida';
-            } elseif (! isset($seriesLookup[$seriesName])) {
-                $rowErrors[] = "Columna B (Serie Documental): '{$seriesName}' no encontrada — use el desplegable";
-            } else {
-                $data['documentary_series_id'] = $seriesLookup[$seriesName];
+            } elseif ($unitId && ! isset($unitSeriesMap[$seriesName])) {
+                $rowErrors[] = "Columna B (Serie Documental): '{$seriesName}' no está asignada a esta dependencia";
+            } elseif ($unitId) {
+                $seriesId                      = $unitSeriesMap[$seriesName];
+                $data['documentary_series_id'] = $seriesId;
             }
 
-            // Columna C — Subserie Documental (opcional)
+            // Columna C — Subserie Documental (obligatoria, validar contra la serie)
             $subseriesName = trim($row[2] ?? '');
-            if (! empty($subseriesName)) {
-                if (! isset($subseriesLookup[$subseriesName])) {
-                    $rowErrors[] = "Columna C (Subserie Documental): '{$subseriesName}' no encontrada — use el desplegable";
-                } else {
-                    $data['documentary_subseries_id'] = $subseriesLookup[$subseriesName];
-                }
+            $seriesSubMap  = $seriesId ? ($subseriesAllowedBySeries[$seriesId] ?? []) : [];
+
+            if (empty($subseriesName)) {
+                $rowErrors[] = 'Columna C (Subserie Documental): es requerida';
+            } elseif ($seriesId && ! isset($seriesSubMap[$subseriesName])) {
+                $rowErrors[] = "Columna C (Subserie Documental): '{$subseriesName}' no pertenece a la serie seleccionada";
+            } elseif ($seriesId) {
+                $data['documentary_subseries_id'] = $seriesSubMap[$subseriesName];
             }
 
             // Columna D — Año (obligatorio)
@@ -151,19 +185,12 @@ class AdministrativeActImporter
     /**
      * Genera la plantilla Excel pre-diligenciada para el usuario.
      *
-     * Estructura:
-     *   Fila 1 — Banner de instrucciones (fondo ámbar)
-     *   Fila 2 — Encabezados
-     *   Filas 3-102 — Datos (100 filas)
-     *   Hojas adicionales: "Lista de Series" y "Lista de Subseries" (catálogos visibles)
-     *
-     * Columnas:
-     *   A = Dependencia        (pre-llenada + bloqueada)
-     *   B = Serie Documental * (obligatoria, desplegable)
-     *   C = Subserie           (opcional, desplegable)
-     *   D = Año                (pre-llenado + bloqueado)
-     *   E = Asunto *           (obligatorio, texto libre)
-     *   F = Observaciones      (opcional, texto libre)
+     * Características:
+     * - Series filtradas por la unidad organizacional del usuario (ccd_entries)
+     * - Desplegable de Subserie dependiente: al seleccionar una Serie en col B,
+     *   la col C muestra únicamente las subseries de esa serie asignadas a la unidad.
+     * - Ambos campos son obligatorios.
+     * - La col G (oculta) contiene la fórmula helper que hace funcionar el INDIRECT.
      */
     public static function generateTemplate(User $user): Spreadsheet
     {
@@ -172,15 +199,54 @@ class AdministrativeActImporter
         $sheet->setTitle('Registro de Documentos');
 
         $unitName    = $user->organizationalUnit?->name ?? '';
+        $unitId      = $user->organizational_unit_id;
         $currentYear = (int) date('Y');
 
-        // ── Fila 1: Banner de instrucciones ─────────────────────────────────
+        // ── Obtener series y subseries de la unidad via ccd_entries ──────
+        if ($unitId) {
+            $ccdEntries = CcdEntry::with([
+                'documentarySeries:id,code,name,is_active',
+                'documentarySubseries:id,code,name,is_active',
+            ])->where('organizational_unit_id', $unitId)->get();
+
+            $seriesList = $ccdEntries
+                ->filter(fn ($e) => $e->documentarySeries?->is_active)
+                ->pluck('documentarySeries')
+                ->unique('id')
+                ->sortBy('code')
+                ->values();
+
+            $subseriesBySeriesId = $ccdEntries
+                ->filter(fn ($e) => $e->documentarySeries && $e->documentarySubseries?->is_active)
+                ->groupBy('documentary_series_id')
+                ->map(fn ($group) => $group
+                    ->pluck('documentarySubseries')
+                    ->unique('id')
+                    ->sortBy('code')
+                    ->values());
+        } else {
+            // Fallback para super_admin sin unidad asignada: mostrar todas las series activas
+            $seriesList = DocumentarySeries::where('is_active', true)
+                ->where('context', 'ccd')
+                ->orderBy('code')
+                ->get();
+
+            $subseriesBySeriesId = DocumentarySubseries::where('is_active', true)
+                ->where('context', 'ccd')
+                ->get()
+                ->groupBy('documentary_series_id');
+        }
+
+        $seriesValues = $seriesList->map(fn ($s) => "{$s->code} - {$s->name}")->toArray();
+        $seriesCount  = count($seriesValues);
+
+        // ── Fila 1: Banner de instrucciones ──────────────────────────────
         $sheet->mergeCells('A1:F1');
         $sheet->setCellValue('A1',
-            'INSTRUCCIONES: Diligencie los campos desde la fila 3. ' .
-            'Los campos marcados con * son obligatorios. ' .
-            'Las columnas "Dependencia" y "Año" ya están diligenciadas y NO se deben modificar. ' .
-            'Use el desplegable (▼) en "Serie" y "Subserie" para seleccionar el valor correcto.'
+            'INSTRUCCIONES: Diligencie desde la fila 3. Los campos con * son obligatorios. ' .
+            '"Dependencia" y "Año" ya están diligenciados — no los modifique. ' .
+            'Primero seleccione la Serie (▼ col B); la Subserie (▼ col C) ' .
+            'mostrará automáticamente solo las opciones de esa serie.'
         );
         $sheet->getStyle('A1')->applyFromArray([
             'font'      => ['bold' => true, 'size' => 10, 'color' => ['rgb' => '92400E']],
@@ -190,51 +256,44 @@ class AdministrativeActImporter
         ]);
         $sheet->getRowDimension(1)->setRowHeight(50);
 
-        // ── Fila 2: Encabezados ──────────────────────────────────────────────
+        // ── Fila 2: Encabezados ───────────────────────────────────────────
         $headers = [
             'A2' => "Dependencia\n(no modificar)",
-            'B2' => "Serie Documental *\n(seleccionar de la lista ▼)",
-            'C2' => "Subserie Documental\n(opcional – seleccionar ▼)",
+            'B2' => "Serie Documental *\n(seleccionar ▼)",
+            'C2' => "Subserie Documental *\n(seleccionar ▼ según Serie)",
             'D2' => "Año\n(no modificar)",
             'E2' => "Asunto / Descripción del Documento *",
             'F2' => "Observaciones\n(opcional)",
         ];
-
         foreach ($headers as $cell => $value) {
             $sheet->setCellValue($cell, $value);
         }
 
-        $baseHeaderStyle = [
+        $sheet->getStyle('A2:F2')->applyFromArray([
             'font'      => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 10],
             'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E3A8A']],
             'borders'   => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '93C5FD']]],
             'alignment' => ['wrapText' => true, 'vertical' => Alignment::VERTICAL_CENTER,
                             'horizontal' => Alignment::HORIZONTAL_CENTER],
-        ];
-        $sheet->getStyle('A2:F2')->applyFromArray($baseHeaderStyle);
-
-        // Las columnas pre-llenadas/bloqueadas con tono más oscuro
-        $lockedHeaderStyle = ['fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E2A5E']]];
-        $sheet->getStyle('A2')->applyFromArray($lockedHeaderStyle);
-        $sheet->getStyle('D2')->applyFromArray($lockedHeaderStyle);
-
+        ]);
+        // Columnas pre-llenadas con tono más oscuro
+        $sheet->getStyle('A2')->applyFromArray(['fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E2A5E']]]);
+        $sheet->getStyle('D2')->applyFromArray(['fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E2A5E']]]);
         $sheet->getRowDimension(2)->setRowHeight(46);
 
-        // ── Anchos de columna ────────────────────────────────────────────────
-        $widths = ['A' => 34, 'B' => 32, 'C' => 36, 'D' => 10, 'E' => 58, 'F' => 40];
-        foreach ($widths as $col => $width) {
-            $sheet->getColumnDimension($col)->setWidth($width);
+        // ── Anchos de columna ─────────────────────────────────────────────
+        foreach (['A' => 34, 'B' => 36, 'C' => 40, 'D' => 10, 'E' => 58, 'F' => 40] as $col => $w) {
+            $sheet->getColumnDimension($col)->setWidth($w);
         }
 
-        // ── Filas de datos 3–102 ─────────────────────────────────────────────
-        // Estilos
-        $lockedCellStyle = [
+        // ── Filas de datos 3–102 ──────────────────────────────────────────
+        $lockedStyle = [
             'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'EFF6FF']],
             'borders'   => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'BFDBFE']]],
             'font'      => ['color' => ['rgb' => '1E3A8A'], 'italic' => true],
             'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
         ];
-        $editableCellStyle = [
+        $editableStyle = [
             'borders'   => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'D1D5DB']]],
             'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
         ];
@@ -247,102 +306,110 @@ class AdministrativeActImporter
             $sheet->getRowDimension($row)->setRowHeight(18);
         }
 
-        $sheet->getStyle('A3:A102')->applyFromArray($lockedCellStyle);
-        $sheet->getStyle('D3:D102')->applyFromArray($lockedCellStyle);
-        $sheet->getStyle('B3:C102')->applyFromArray($editableCellStyle);
-        $sheet->getStyle('E3:F102')->applyFromArray($editableCellStyle);
-
-        // Congelar filas 1 y 2 para que siempre sean visibles al hacer scroll
+        $sheet->getStyle('A3:A102')->applyFromArray($lockedStyle);
+        $sheet->getStyle('D3:D102')->applyFromArray($lockedStyle);
+        $sheet->getStyle('B3:C102')->applyFromArray($editableStyle);
+        $sheet->getStyle('E3:F102')->applyFromArray($editableStyle);
         $sheet->freezePane('A3');
 
-        // ── Catálogos (hojas visibles al final) ──────────────────────────────
-        $seriesValues = DocumentarySeries::where('is_active', true)
-            ->where('context', 'ccd')
-            ->orderBy('code')
-            ->get()
-            ->map(fn ($s) => "{$s->code} - {$s->name}")
-            ->toArray();
+        // ── Hoja catálogo oculta ("Cat") ─────────────────────────────────
+        // Col A  = lista de series de la unidad
+        // Col B+ = subseries de cada serie (una columna por serie)
+        // Cada bloque tiene un named range: SR_LIST para las series,
+        // SR_{code} para las subseries de cada serie (ej: SR_S001, SR_S003).
+        $catalogSheet = $spreadsheet->createSheet();
+        $catalogSheet->setTitle('Cat');
+        $catalogSheet->setSheetState('hidden');
 
-        $subseriesValues = DocumentarySubseries::where('is_active', true)
-            ->where('context', 'ccd')
-            ->orderBy('code')
-            ->get()
-            ->map(fn ($s) => "{$s->code} - {$s->name}")
-            ->toArray();
+        // Columna A: series
+        foreach ($seriesValues as $i => $val) {
+            $catalogSheet->setCellValue('A' . ($i + 2), $val);
+        }
+        if ($seriesCount > 0) {
+            $spreadsheet->addNamedRange(new NamedRange(
+                'SR_LIST',
+                $catalogSheet,
+                '$A$2:$A$' . ($seriesCount + 1)
+            ));
+        }
 
-        // Nombres sin espacios para que la referencia en la fórmula no necesite comillas simples
-        self::addCatalogSheet($spreadsheet, 'Series', $seriesValues);
-        self::addCatalogSheet($spreadsheet, 'Subseries', $subseriesValues);
+        // Columnas B+: subseries por serie
+        $colIdx = 2; // B
+        foreach ($seriesList as $series) {
+            $subseries = $subseriesBySeriesId[$series->id] ?? collect();
+            if ($subseries->isEmpty()) {
+                continue;
+            }
 
-        // ── Desplegables celda por celda (único método fiable en PhpSpreadsheet 1.x) ──
-        // La fórmula referencia la hoja por nombre sin comillas porque no tiene espacios.
-        // setShowDropDown(false) = MOSTRAR la flecha ▼ (el nombre del parámetro es contra-intuitivo)
-        $seriesMax = count($seriesValues) + 1;
-        $subMax    = count($subseriesValues) + 1;
+            $subValues = $subseries->map(fn ($sub) => "{$sub->code} - {$sub->name}")->toArray();
+            $colLetter = Coordinate::stringFromColumnIndex($colIdx);
 
+            foreach ($subValues as $j => $subVal) {
+                $catalogSheet->setCellValue($colLetter . ($j + 2), $subVal);
+            }
+
+            // Named range: SR_S001, SR_S003, etc.
+            // preg_replace elimina caracteres no válidos para nombres de rango
+            $rangeName = 'SR_' . preg_replace('/[^A-Z0-9]/i', '_', $series->code);
+            $spreadsheet->addNamedRange(new NamedRange(
+                $rangeName,
+                $catalogSheet,
+                '$' . $colLetter . '$2:$' . $colLetter . '$' . (count($subValues) + 1)
+            ));
+
+            $colIdx++;
+        }
+
+        // ── Columna G (oculta): extrae el nombre del named range desde col B ─
+        // Fórmula: =IFERROR("SR_"&LEFT(B3, FIND(" - ",B3)-1), "")
+        // Ejemplo: "S001 - ACCIONES" → LEFT hasta posición 4 → "S001" → "SR_S001"
+        // Al cambiar B3, G3 se recalcula y el INDIRECT de C3 carga el rango correcto.
         for ($row = 3; $row <= 102; $row++) {
-            // Columna B — Serie (obligatoria)
-            if (! empty($seriesValues)) {
+            $sheet->setCellValue(
+                "G{$row}",
+                "=IFERROR(\"SR_\"&LEFT(B{$row},FIND(\" - \",B{$row})-1),\"\")"
+            );
+        }
+        $sheet->getColumnDimension('G')->setVisible(false);
+
+        // ── Validaciones (desplegables) ───────────────────────────────────
+        for ($row = 3; $row <= 102; $row++) {
+
+            // Columna B — Serie (named range fijo SR_LIST)
+            if ($seriesCount > 0) {
                 $v = $sheet->getCell("B{$row}")->getDataValidation();
                 $v->setType(DataValidation::TYPE_LIST);
                 $v->setErrorStyle(DataValidation::STYLE_STOP);
                 $v->setAllowBlank(false);
-                $v->setShowDropDown(true);    // true→XML showDropDown="0"→Excel MUESTRA la flecha ▼
-                $v->setShowErrorMessage(true);
+                $v->setShowDropDown(true);
                 $v->setShowInputMessage(true);
-                $v->setPromptTitle('Serie Documental');
-                $v->setPrompt('Haga clic en la flecha ▼ para ver y seleccionar la serie.');
+                $v->setShowErrorMessage(true);
+                $v->setPromptTitle('Serie Documental *');
+                $v->setPrompt('Haga clic en ▼ para seleccionar la serie. La Subserie se actualizará automáticamente.');
                 $v->setErrorTitle('Valor no válido');
                 $v->setError('Seleccione una serie de la lista. No escriba valores que no estén en el catálogo.');
-                $v->setFormula1("Series!\$A\$2:\$A\${$seriesMax}");
+                $v->setFormula1('SR_LIST');
             }
 
-            // Columna C — Subserie (opcional)
-            if (! empty($subseriesValues)) {
-                $v = $sheet->getCell("C{$row}")->getDataValidation();
-                $v->setType(DataValidation::TYPE_LIST);
-                $v->setErrorStyle(DataValidation::STYLE_INFORMATION);
-                $v->setAllowBlank(true);
-                $v->setShowDropDown(true);    // true→XML showDropDown="0"→Excel MUESTRA la flecha ▼
-                $v->setShowErrorMessage(true);
-                $v->setShowInputMessage(true);
-                $v->setPromptTitle('Subserie Documental');
-                $v->setPrompt('Opcional. Si aplica, haga clic en ▼ para seleccionar. Puede dejarlo en blanco.');
-                $v->setErrorTitle('Valor no encontrado');
-                $v->setError('El valor ingresado no está en el catálogo. Puede dejarlo en blanco si no aplica.');
-                $v->setFormula1("Subseries!\$A\$2:\$A\${$subMax}");
-            }
+            // Columna C — Subserie (named range dinámico via INDIRECT(G{row}))
+            // Cuando el usuario selecciona una serie en Bn, Gn se actualiza a "SR_Snnn"
+            // y este INDIRECT muestra solo las subseries de esa serie.
+            $v = $sheet->getCell("C{$row}")->getDataValidation();
+            $v->setType(DataValidation::TYPE_LIST);
+            $v->setErrorStyle(DataValidation::STYLE_STOP);
+            $v->setAllowBlank(false);
+            $v->setShowDropDown(true);
+            $v->setShowInputMessage(true);
+            $v->setShowErrorMessage(true);
+            $v->setPromptTitle('Subserie Documental *');
+            $v->setPrompt('Primero seleccione la Serie en col B, luego haga clic en ▼ para ver las subseries disponibles.');
+            $v->setErrorTitle('Subserie requerida');
+            $v->setError('Seleccione una subserie válida. Primero debe seleccionar la Serie en la columna B.');
+            $v->setFormula1("INDIRECT(G{$row})");
         }
 
-        // NOTA: No se aplica protección de hoja porque puede bloquear la interacción
-        // con los desplegables en algunas versiones de Excel/LibreOffice.
-
-        // ── Volver a la hoja principal ───────────────────────────────────────
         $spreadsheet->setActiveSheetIndex(0);
 
         return $spreadsheet;
-    }
-
-    /**
-     * Crea una hoja de catálogo visible con los valores disponibles.
-     */
-    protected static function addCatalogSheet(Spreadsheet $spreadsheet, string $title, array $values): void
-    {
-        $sheet = $spreadsheet->createSheet();
-        $sheet->setTitle($title);
-
-        $sheet->setCellValue('A1', 'Valores disponibles');
-        $sheet->getStyle('A1')->applyFromArray([
-            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
-            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E3A8A']],
-        ]);
-
-        $row = 2;
-        foreach ($values as $value) {
-            $sheet->setCellValue("A{$row}", $value);
-            $row++;
-        }
-
-        $sheet->getColumnDimension('A')->setAutoSize(true);
     }
 }
