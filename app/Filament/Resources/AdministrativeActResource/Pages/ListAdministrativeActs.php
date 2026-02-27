@@ -32,6 +32,7 @@ class ListAdministrativeActs extends ListRecords
                 ]),
 
             Actions\CreateAction::make()
+                ->label('Crear documento')
                 ->extraAttributes([
                     'data-tour' => 'create-button-acts',
                 ]),
