@@ -61,6 +61,11 @@ class OrganizationalUnitResource extends Resource
                         Forms\Components\Toggle::make('is_active')
                             ->label('Activo')
                             ->default(true),
+
+                        Forms\Components\Toggle::make('can_import')
+                            ->label('Puede importar registros')
+                            ->helperText('Permite a los usuarios de esta unidad ver y usar los botones Descargar Plantilla e Importar.')
+                            ->default(false),
                     ])
                     ->columns(2),
             ]);
@@ -93,6 +98,10 @@ class OrganizationalUnitResource extends Resource
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Activo')
                     ->boolean()
+                    ->sortable(),
+
+                Tables\Columns\ToggleColumn::make('can_import')
+                    ->label('Puede importar')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('created_at')

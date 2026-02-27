@@ -63,7 +63,6 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Pages\CambiarPassword::class,
                 \App\Filament\Pages\ImportErrors::class,
                 \App\Filament\Pages\MonthlyReportPage::class,
-                \App\Filament\Pages\ImportPermissionsPage::class,
             ])
             ->authenticatedRoutes(function (): void {
                 // Registro con string literal para evitar carga de clase en tiempo de boot.
