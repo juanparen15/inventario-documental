@@ -22,6 +22,11 @@ class ImportPermissionsPage extends Page
         return auth()->user()?->hasRole('super_admin') ?? false;
     }
 
+    public static function getNavigationUrl(): string
+    {
+        return url('/admin/import-permissions');
+    }
+
     public function mount(): void
     {
         $this->loadUnits();
