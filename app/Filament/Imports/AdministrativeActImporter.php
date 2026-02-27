@@ -59,9 +59,11 @@ class AdministrativeActImporter
         //
         // seriesAllowedByUnit[unitId][displayName] = seriesId
         // subseriesAllowedBySeries[seriesId][displayName] = subseriesId
+        // Construir lookups desde ccd_entries (solo series/subseries con context='ccd').
+        // Para unidades sin series CCD en ccd_entries, se usa fallback con todas las CCD activas.
         $ccdAll = CcdEntry::with([
-            'documentarySeries:id,code,name,is_active',
-            'documentarySubseries:id,code,name,is_active',
+            'documentarySeries:id,code,name,is_active,context',
+            'documentarySubseries:id,code,name,is_active,context',
         ])->get();
 
         $seriesAllowedByUnit      = [];
@@ -69,7 +71,7 @@ class AdministrativeActImporter
 
         foreach ($ccdAll as $entry) {
             $s = $entry->documentarySeries;
-            if (! $s || ! $s->is_active) {
+            if (! $s || ! $s->is_active || $s->context !== 'ccd') {
                 continue;
             }
 
@@ -80,11 +82,28 @@ class AdministrativeActImporter
             $seriesAllowedByUnit[$unitId][$s->name]  = $s->id;
 
             $sub = $entry->documentarySubseries;
-            if ($sub && $sub->is_active) {
+            if ($sub && $sub->is_active && $sub->context === 'ccd') {
                 $subDisplay = "{$sub->code} - {$sub->name}";
                 $subseriesAllowedBySeries[$s->id][$subDisplay] = $sub->id;
                 $subseriesAllowedBySeries[$s->id][$sub->name]  = $sub->id;
             }
+        }
+
+        // Fallback: si la unidad no tiene series CCD en ccd_entries,
+        // permitir cualquier serie/subserie activa con context='ccd'
+        $allCcdSeries = DocumentarySeries::where('is_active', true)
+            ->where('context', 'ccd')
+            ->get(['id', 'code', 'name']);
+        $allCcdSubseries = DocumentarySubseries::where('is_active', true)
+            ->where('context', 'ccd')
+            ->get(['id', 'code', 'name', 'documentary_series_id']);
+
+        $allCcdSeriesMap = $allCcdSeries
+            ->flatMap(fn ($s) => ["{$s->code} - {$s->name}" => $s->id, $s->name => $s->id])
+            ->toArray();
+        foreach ($allCcdSubseries as $sub) {
+            $allCcdSubseriesMap[$sub->documentary_series_id]["{$sub->code} - {$sub->name}"] = $sub->id;
+            $allCcdSubseriesMap[$sub->documentary_series_id][$sub->name] = $sub->id;
         }
 
         foreach ($rows as $index => $row) {
@@ -111,22 +130,28 @@ class AdministrativeActImporter
                 $data['organizational_unit_id']  = $unitId;
             }
 
-            // Columna B — Serie Documental (obligatoria, validar contra ccd_entries)
+            // Columna B — Serie Documental (obligatoria)
+            // Usa las series asignadas en ccd_entries; si la unidad no tiene ninguna,
+            // acepta cualquier serie CCD activa del sistema (fallback).
             $seriesName    = trim($row[1] ?? '');
-            $unitSeriesMap = $unitId ? ($seriesAllowedByUnit[$unitId] ?? []) : [];
+            $unitSeriesMap = $unitId
+                ? (! empty($seriesAllowedByUnit[$unitId]) ? $seriesAllowedByUnit[$unitId] : $allCcdSeriesMap)
+                : [];
 
             if (empty($seriesName)) {
                 $rowErrors[] = 'Columna B (Serie Documental): es requerida';
             } elseif ($unitId && ! isset($unitSeriesMap[$seriesName])) {
-                $rowErrors[] = "Columna B (Serie Documental): '{$seriesName}' no está asignada a esta dependencia";
+                $rowErrors[] = "Columna B (Serie Documental): '{$seriesName}' no es una serie CCD válida";
             } elseif ($unitId) {
                 $seriesId                      = $unitSeriesMap[$seriesName];
                 $data['documentary_series_id'] = $seriesId;
             }
 
-            // Columna C — Subserie Documental (obligatoria, validar contra la serie)
+            // Columna C — Subserie Documental (obligatoria)
             $subseriesName = trim($row[2] ?? '');
-            $seriesSubMap  = $seriesId ? ($subseriesAllowedBySeries[$seriesId] ?? []) : [];
+            $seriesSubMap  = $seriesId
+                ? (! empty($subseriesAllowedBySeries[$seriesId]) ? $subseriesAllowedBySeries[$seriesId] : ($allCcdSubseriesMap[$seriesId] ?? []))
+                : [];
 
             if (empty($subseriesName)) {
                 $rowErrors[] = 'Columna C (Subserie Documental): es requerida';
@@ -202,30 +227,48 @@ class AdministrativeActImporter
         $unitId      = $user->organizational_unit_id;
         $currentYear = (int) date('Y');
 
-        // ── Obtener series y subseries de la unidad via ccd_entries ──────
+        // ── Obtener series y subseries de la unidad (solo context='ccd') ──
+        // Intento 1: series CCD asignadas a la unidad via ccd_entries
+        // Intento 2 (fallback): si la unidad no tiene series CCD en ccd_entries,
+        //   mostrar todas las series CCD activas del sistema
         if ($unitId) {
             $ccdEntries = CcdEntry::with([
-                'documentarySeries:id,code,name,is_active',
-                'documentarySubseries:id,code,name,is_active',
+                'documentarySeries:id,code,name,is_active,context',
+                'documentarySubseries:id,code,name,is_active,context',
             ])->where('organizational_unit_id', $unitId)->get();
 
             $seriesList = $ccdEntries
-                ->filter(fn ($e) => $e->documentarySeries?->is_active)
+                ->filter(fn ($e) => $e->documentarySeries?->is_active && $e->documentarySeries?->context === 'ccd')
                 ->pluck('documentarySeries')
                 ->unique('id')
                 ->sortBy('code')
                 ->values();
 
-            $subseriesBySeriesId = $ccdEntries
-                ->filter(fn ($e) => $e->documentarySeries && $e->documentarySubseries?->is_active)
-                ->groupBy('documentary_series_id')
-                ->map(fn ($group) => $group
-                    ->pluck('documentarySubseries')
-                    ->unique('id')
-                    ->sortBy('code')
-                    ->values());
+            if ($seriesList->isNotEmpty()) {
+                $subseriesBySeriesId = $ccdEntries
+                    ->filter(fn ($e) => $e->documentarySeries?->context === 'ccd'
+                        && $e->documentarySubseries?->is_active
+                        && $e->documentarySubseries?->context === 'ccd')
+                    ->groupBy('documentary_series_id')
+                    ->map(fn ($group) => $group
+                        ->pluck('documentarySubseries')
+                        ->unique('id')
+                        ->sortBy('code')
+                        ->values());
+            } else {
+                // La unidad no tiene series CCD en ccd_entries: mostrar todas las CCD activas
+                $seriesList = DocumentarySeries::where('is_active', true)
+                    ->where('context', 'ccd')
+                    ->orderBy('code')
+                    ->get();
+
+                $subseriesBySeriesId = DocumentarySubseries::where('is_active', true)
+                    ->where('context', 'ccd')
+                    ->get()
+                    ->groupBy('documentary_series_id');
+            }
         } else {
-            // Fallback para super_admin sin unidad asignada: mostrar todas las series activas
+            // Fallback para super_admin sin unidad asignada
             $seriesList = DocumentarySeries::where('is_active', true)
                 ->where('context', 'ccd')
                 ->orderBy('code')
