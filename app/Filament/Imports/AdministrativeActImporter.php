@@ -14,7 +14,6 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\Protection;
 
 class AdministrativeActImporter
 {
@@ -271,11 +270,14 @@ class AdministrativeActImporter
             ->map(fn ($s) => "{$s->code} - {$s->name}")
             ->toArray();
 
-        self::addCatalogSheet($spreadsheet, 'Lista de Series', $seriesValues);
-        self::addCatalogSheet($spreadsheet, 'Lista de Subseries', $subseriesValues);
+        // Nombres sin espacios para que la referencia en la fórmula no necesite comillas simples
+        self::addCatalogSheet($spreadsheet, 'Series', $seriesValues);
+        self::addCatalogSheet($spreadsheet, 'Subseries', $subseriesValues);
 
         // ── Desplegables celda por celda (único método fiable en PhpSpreadsheet 1.x) ──
-        $seriesMax = count($seriesValues) + 1;   // fila final del catálogo (fila 1 = encabezado)
+        // La fórmula referencia la hoja por nombre sin comillas porque no tiene espacios.
+        // setShowDropDown(false) = MOSTRAR la flecha ▼ (el nombre del parámetro es contra-intuitivo)
+        $seriesMax = count($seriesValues) + 1;
         $subMax    = count($subseriesValues) + 1;
 
         for ($row = 3; $row <= 102; $row++) {
@@ -285,14 +287,14 @@ class AdministrativeActImporter
                 $v->setType(DataValidation::TYPE_LIST);
                 $v->setErrorStyle(DataValidation::STYLE_STOP);
                 $v->setAllowBlank(false);
-                $v->setShowDropDown(false);   // false = mostrar flecha ▼
+                $v->setShowDropDown(false);
                 $v->setShowErrorMessage(true);
                 $v->setShowInputMessage(true);
                 $v->setPromptTitle('Serie Documental');
                 $v->setPrompt('Haga clic en la flecha ▼ para ver y seleccionar la serie.');
                 $v->setErrorTitle('Valor no válido');
                 $v->setError('Seleccione una serie de la lista. No escriba valores que no estén en el catálogo.');
-                $v->setFormula1("'Lista de Series'!\$A\$2:\$A\${$seriesMax}");
+                $v->setFormula1("Series!\$A\$2:\$A\${$seriesMax}");
             }
 
             // Columna C — Subserie (opcional)
@@ -308,19 +310,12 @@ class AdministrativeActImporter
                 $v->setPrompt('Opcional. Si aplica, haga clic en ▼ para seleccionar. Puede dejarlo en blanco.');
                 $v->setErrorTitle('Valor no encontrado');
                 $v->setError('El valor ingresado no está en el catálogo. Puede dejarlo en blanco si no aplica.');
-                $v->setFormula1("'Lista de Subseries'!\$A\$2:\$A\${$subMax}");
+                $v->setFormula1("Subseries!\$A\$2:\$A\${$subMax}");
             }
         }
 
-        // ── Protección: bloquear A y D, dejar libres B, C, E, F ─────────────
-        $unlocked = ['protection' => ['locked' => Protection::PROTECTION_UNPROTECTED]];
-        $sheet->getStyle('B3:B102')->applyFromArray($unlocked);
-        $sheet->getStyle('C3:C102')->applyFromArray($unlocked);
-        $sheet->getStyle('E3:E102')->applyFromArray($unlocked);
-        $sheet->getStyle('F3:F102')->applyFromArray($unlocked);
-
-        $sheet->getProtection()->setSheet(true);
-        $sheet->getProtection()->setSelectLockedCells(false);
+        // NOTA: No se aplica protección de hoja porque puede bloquear la interacción
+        // con los desplegables en algunas versiones de Excel/LibreOffice.
 
         // ── Volver a la hoja principal ───────────────────────────────────────
         $spreadsheet->setActiveSheetIndex(0);
