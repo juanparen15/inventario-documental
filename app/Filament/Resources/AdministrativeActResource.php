@@ -37,7 +37,7 @@ class AdministrativeActResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Informacion del Acto')
+                Forms\Components\Section::make('Informacion del Sistema Unificado de Registro')
                     ->columns(2)
                     ->schema([
                         Forms\Components\Select::make('organizational_unit_id')
@@ -384,7 +384,8 @@ class AdministrativeActResource extends Resource
                     ->label('Unidad Organizacional')
                     ->relationship('organizationalUnit', 'name')
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->visible(fn () => auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
 
                 Tables\Filters\SelectFilter::make('documentary_series_id')
                     ->label('Serie Documental')
@@ -439,10 +440,18 @@ class AdministrativeActResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
+        $user = auth()->user();
+
+        if ($user && ! $user->hasAnyRole(['super_admin', 'supervisor']) && $user->organizational_unit_id) {
+            $query->where('organizational_unit_id', $user->organizational_unit_id);
+        }
+
+        return $query;
     }
 
     public static function getGloballySearchableAttributes(): array
