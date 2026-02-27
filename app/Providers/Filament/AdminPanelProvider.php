@@ -76,10 +76,6 @@ class AdminPanelProvider extends PanelProvider
                             \App\Filament\Pages\MonthlyReportPage::class
                         )->name('monthly-report');
 
-                        \Illuminate\Support\Facades\Route::get(
-                            '/import-permissions',
-                            \App\Filament\Pages\ImportPermissionsPage::class
-                        )->name('import-permissions');
                     });
             })
             ->userMenuItems([
