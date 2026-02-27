@@ -96,17 +96,17 @@ class AdministrativeAct extends Model
 
         $lastNumber = static::withTrashed()
             ->where('filing_number', 'like', "{$prefix}.%")
-            ->orderByRaw('CAST(SUBSTRING_INDEX(filing_number, \'.\', -1) AS UNSIGNED) DESC')
+            ->orderByRaw('CAST(SUBSTRING_INDEX(REPLACE(filing_number, \'.SUR\', \'\'), \'.\', -1) AS UNSIGNED) DESC')
             ->value('filing_number');
 
         if ($lastNumber) {
-            $parts = explode('.', $lastNumber);
+            $parts = explode('.', str_replace('.SUR', '', $lastNumber));
             $seq = (int) end($parts) + 1;
         } else {
             $seq = 1;
         }
 
-        return sprintf('%s.%03d', $prefix, $seq);
+        return sprintf('%s.%03d.SUR', $prefix, $seq);
     }
 
     /**
@@ -139,17 +139,17 @@ class AdministrativeAct extends Model
 
         $lastNumber = static::withTrashed()
             ->where('filing_number', 'like', "{$prefix}.%")
-            ->orderByRaw('CAST(SUBSTRING_INDEX(filing_number, \'.\', -1) AS UNSIGNED) DESC')
+            ->orderByRaw('CAST(SUBSTRING_INDEX(REPLACE(filing_number, \'.SUR\', \'\'), \'.\', -1) AS UNSIGNED) DESC')
             ->value('filing_number');
 
         if ($lastNumber) {
-            $parts = explode('.', $lastNumber);
+            $parts = explode('.', str_replace('.SUR', '', $lastNumber));
             $seq = (int) end($parts) + 1;
         } else {
             $seq = 1;
         }
 
-        return sprintf('%s.%03d', $prefix, $seq);
+        return sprintf('%s.%03d.SUR', $prefix, $seq);
     }
 
     public function user(): BelongsTo
