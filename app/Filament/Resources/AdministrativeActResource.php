@@ -130,6 +130,8 @@ class AdministrativeActResource extends Resource
                             ->preload()
                             ->required()
                             ->live()
+                            ->disabled(fn(?AdministrativeAct $record) => $record !== null)
+                            ->dehydrated()
                             ->afterStateUpdated(function (Forms\Set $set) {
                                 $set('documentary_subseries_id', null);
                                 $set('filing_number_preview', null);
@@ -168,7 +170,12 @@ class AdministrativeActResource extends Resource
                             ->searchable()
                             ->preload()
                             ->live()
-                            ->required(function (Get $get) {
+                            ->disabled(fn(?AdministrativeAct $record) => $record !== null)
+                            ->dehydrated()
+                            ->required(function (Get $get, ?AdministrativeAct $record) {
+                                if ($record !== null) {
+                                    return false;
+                                }
                                 $unitId = $get('organizational_unit_id');
                                 $seriesId = $get('documentary_series_id');
                                 if (!$unitId || !$seriesId) {
@@ -244,6 +251,36 @@ class AdministrativeActResource extends Resource
                             ->extraAttributes(['data-tour' => 'act-folios'])
                             ->helperText('Calculado automaticamente a partir de los PDF adjuntos.'),
                     ]),
+
+                Forms\Components\Section::make('Documentos Confidenciales')
+                    ->description('Solo tú y usuarios de tu unidad pueden ver estos documentos. Los supervisores y administradores no tienen acceso.')
+                    ->icon('heroicon-o-lock-closed')
+                    ->iconColor('warning')
+                    ->collapsible()
+                    ->schema([
+                        Forms\Components\FileUpload::make('confidential_attachments')
+                            ->label('Archivos Confidenciales (PDF)')
+                            ->directory('administrative-acts-confidential')
+                            ->multiple()
+                            ->acceptedFileTypes(['application/pdf'])
+                            ->maxSize(20480)
+                            ->downloadable()
+                            ->openable()
+                            ->reorderable()
+                            ->live(),
+                    ])
+                    ->hidden(fn() => auth()->user()?->hasAnyRole(['super_admin', 'supervisor']))
+                    ->dehydrated(fn() => !auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
+
+                Forms\Components\Section::make('Registro de retraso')
+                    ->icon('heroicon-o-clock')
+                    ->iconColor('danger')
+                    ->schema([
+                        Forms\Components\Placeholder::make('late_upload_reason')
+                            ->label('Razón del retraso')
+                            ->content(fn(?AdministrativeAct $record) => $record?->late_upload_reason ?? '—'),
+                    ])
+                    ->hidden(fn(?AdministrativeAct $record) => empty($record?->late_upload_reason)),
             ]);
     }
 
@@ -292,29 +329,24 @@ class AdministrativeActResource extends Resource
                     ->sortable()
                     ->formatStateUsing(function ($state) {
                         if (empty($state)) {
-                            return '-';
+                            return '—';
                         }
                         $count = is_array($state) ? count($state) : 1;
                         return $count . ' PDF' . ($count > 1 ? 's' : '');
                     })
                     ->icon(fn($state) => !empty($state) ? 'heroicon-o-document' : null)
                     ->color(fn($state) => !empty($state) ? 'success' : 'gray')
-                    ->action(
-                        Tables\Actions\Action::make('viewAttachments')
-                            ->modalHeading('Archivos PDF Adjuntos')
-                            ->modalContent(function (AdministrativeAct $record) {
-                                $attachments = $record->attachments ?? [];
-                                if (empty($attachments)) {
-                                    return view('filament.components.no-attachments');
-                                }
-                                return view('filament.components.attachments-list', [
-                                    'attachments' => $attachments,
-                                ]);
-                            })
-                            ->modalSubmitAction(false)
-                            ->modalCancelActionLabel('Cerrar')
-                    )
                     ->toggleable(),
+
+                Tables\Columns\TextColumn::make('confidential_attachments')
+                    ->label('Conf.')
+                    ->getStateUsing(function (AdministrativeAct $record): string {
+                        $count = count($record->confidential_attachments ?? []);
+                        return $count > 0 ? "🔒 {$count}" : '—';
+                    })
+                    ->color(fn($state) => $state !== '—' ? 'warning' : 'gray')
+                    ->tooltip('Archivos confidenciales')
+                    ->toggleable(isToggledHiddenByDefault: false),
 
                 Tables\Columns\TextColumn::make('organizationalUnit.entity.name')
                     ->label('Entidad')
@@ -410,7 +442,122 @@ class AdministrativeActResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+
+                Tables\Actions\Action::make('viewAttachments')
+                    ->label('Ver PDFs')
+                    ->icon('heroicon-o-document-text')
+                    ->color('success')
+                    ->authorize(fn() => true)
+                    ->visible(fn(AdministrativeAct $record) =>
+                        !empty($record->attachments) || !empty($record->confidential_attachments)
+                    )
+                    ->modalHeading('Archivos PDF Adjuntos')
+                    ->modalWidth('5xl')
+                    ->modalContent(function (AdministrativeAct $record) {
+                        $attachments = $record->attachments ?? [];
+                        $isAdmin = auth()->user()?->hasAnyRole(['super_admin', 'supervisor']);
+                        $confidential = $isAdmin ? [] : ($record->confidential_attachments ?? []);
+                        $confidentialCount = count($record->confidential_attachments ?? []);
+
+                        if (empty($attachments) && empty($confidential) && (!$isAdmin || $confidentialCount === 0)) {
+                            return view('filament.components.no-attachments');
+                        }
+                        return view('filament.components.attachments-list', [
+                            'attachments'       => $attachments,
+                            'confidential'      => $confidential,
+                            'confidentialCount' => $isAdmin ? $confidentialCount : 0,
+                            'isAdmin'           => $isAdmin,
+                        ]);
+                    })
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Cerrar'),
+
+                Tables\Actions\EditAction::make()
+                    ->visible(fn(AdministrativeAct $record) => $record->created_at->diffInDays(now()) <= 30),
+
+                Tables\Actions\Action::make('uploadLate')
+                    ->label('Subir PDF')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('warning')
+                    ->modalHeading('Subir documento con retraso')
+                    ->modalDescription('El plazo de 30 días ha vencido. Adjunta el documento PDF e indica la razón del retraso.')
+                    ->modalWidth('lg')
+                    ->visible(fn(AdministrativeAct $record) => $record->lacksPdf() && $record->pdfDaysRemaining() < 0)
+                    ->form([
+                        Forms\Components\Toggle::make('is_confidential')
+                            ->label('Documento confidencial')
+                            ->helperText('Activa esta opción si el documento debe ser privado para tu unidad.')
+                            ->default(false)
+                            ->live()
+                            ->hidden(fn() => auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
+
+                        Forms\Components\FileUpload::make('regular_files')
+                            ->label('Documentos PDF')
+                            ->directory('administrative-acts')
+                            ->multiple()
+                            ->acceptedFileTypes(['application/pdf'])
+                            ->maxSize(20480)
+                            ->hidden(fn(Get $get) => $get('is_confidential') && !auth()->user()?->hasAnyRole(['super_admin', 'supervisor']))
+                            ->required(fn(Get $get) => !$get('is_confidential') || auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
+
+                        Forms\Components\FileUpload::make('confidential_files')
+                            ->label('Documentos PDF (Confidencial 🔒)')
+                            ->directory('administrative-acts-confidential')
+                            ->multiple()
+                            ->acceptedFileTypes(['application/pdf'])
+                            ->maxSize(20480)
+                            ->hidden(fn(Get $get) => !$get('is_confidential') || auth()->user()?->hasAnyRole(['super_admin', 'supervisor']))
+                            ->required(fn(Get $get) => $get('is_confidential') && !auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
+
+                        Forms\Components\Textarea::make('late_upload_reason')
+                            ->label('Razón del retraso')
+                            ->placeholder('Explique por qué no se subió el documento dentro del plazo de 30 días.')
+                            ->required()
+                            ->maxLength(1000)
+                            ->rows(3),
+                    ])
+                    ->action(function (AdministrativeAct $record, array $data): void {
+                        $isConfidential = ($data['is_confidential'] ?? false)
+                            && !auth()->user()?->hasAnyRole(['super_admin', 'supervisor']);
+
+                        if ($isConfidential) {
+                            $files = array_values(array_filter($data['confidential_files'] ?? []));
+                            $record->update([
+                                'confidential_attachments' => $files,
+                                'late_upload_reason'       => $data['late_upload_reason'],
+                            ]);
+                        } else {
+                            $files = array_values(array_filter($data['regular_files'] ?? []));
+                            $folios = 0;
+                            foreach ($files as $file) {
+                                try {
+                                    $path = storage_path('app/public/' . $file);
+                                    if (file_exists($path)) {
+                                        $folios += static::countPagesFromPdf($path);
+                                    }
+                                } catch (\Throwable) {}
+                            }
+                            $record->update([
+                                'attachments'        => $files,
+                                'late_upload_reason' => $data['late_upload_reason'],
+                                'folios'             => $folios > 0 ? $folios : null,
+                            ]);
+                        }
+
+                        activity('inventory')
+                            ->performedOn($record)
+                            ->causedBy(auth()->user())
+                            ->event('uploaded')
+                            ->withProperties([
+                                'ip'             => request()->ip(),
+                                'confidencial'   => $isConfidential,
+                                'archivos'       => count($files),
+                                'razon_retraso'  => $data['late_upload_reason'],
+                            ])
+                            ->log('PDF subido con retraso');
+                    })
+                    ->successNotificationTitle('Documento subido correctamente'),
+
                 Tables\Actions\DeleteAction::make(),
                 Tables\Actions\RestoreAction::make(),
             ])
@@ -448,8 +595,12 @@ class AdministrativeActResource extends Resource
 
         $user = auth()->user();
 
-        if ($user && ! $user->hasAnyRole(['super_admin', 'supervisor']) && $user->organizational_unit_id) {
-            $query->where('organizational_unit_id', $user->organizational_unit_id);
+        if ($user && ! $user->hasAnyRole(['super_admin', 'supervisor'])) {
+            if ($user->organizational_unit_id) {
+                $query->where('organizational_unit_id', $user->organizational_unit_id);
+            } else {
+                $query->whereRaw('0 = 1');
+            }
         }
 
         return $query;
@@ -463,8 +614,11 @@ class AdministrativeActResource extends Resource
     public static function getNavigationBadge(): ?string
     {
         $user = auth()->user();
-        if ($user && !$user->hasRole('super_admin') && $user->organizational_unit_id) {
-            return static::getModel()::where('organizational_unit_id', $user->organizational_unit_id)->count();
+        if ($user && !$user->hasAnyRole(['super_admin', 'supervisor'])) {
+            if ($user->organizational_unit_id) {
+                return static::getModel()::where('organizational_unit_id', $user->organizational_unit_id)->count();
+            }
+            return '0';
         }
         return static::getModel()::count();
     }

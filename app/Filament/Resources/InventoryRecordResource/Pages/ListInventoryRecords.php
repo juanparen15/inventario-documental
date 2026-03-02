@@ -115,14 +115,20 @@ class ListInventoryRecords extends ListRecords
 
             ExportAction::make()
                 ->label('Exportar')
-                ->visible(fn() => auth()->user()?->hasRole('super_admin'))
+                ->authorize(fn() => true)
                 ->extraAttributes([
                     'data-tour' => 'export-button-inventory',
                 ])
                 ->exports([
                     ExcelExport::make()
                         ->fromTable()
-                        ->withFilename('registros_inventario_' . date('Y-m-d'))
+                        ->withFilename(function ($livewire) {
+                            $unit = auth()->user()?->organizationalUnit?->code
+                                ?? auth()->user()?->organizationalUnit?->name
+                                ?? null;
+                            $suffix = $unit ? '_' . \Illuminate\Support\Str::slug($unit) : '';
+                            return 'registros_inventario' . $suffix . '_' . date('Y-m-d');
+                        })
                         ->withWriterType(\Maatwebsite\Excel\Excel::XLSX)
                         ->withColumns([
                             Column::make('reference_code')->heading('Código de Referencia'),

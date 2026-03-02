@@ -57,6 +57,8 @@ class AdminPanelProvider extends PanelProvider
             ->darkMode(true)
             ->sidebarCollapsibleOnDesktop()
             ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('60s')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->pages([
                 \App\Filament\Pages\Dashboard::class,

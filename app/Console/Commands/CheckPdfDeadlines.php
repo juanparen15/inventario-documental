@@ -28,11 +28,18 @@ class CheckPdfDeadlines extends Command
     {
         $dryRun = $this->option('dry-run');
 
-        // Todos los actos sin PDF y sin soft-delete
+        // Todos los actos sin PDF (ni regular ni confidencial) y sin soft-delete
         $pendingActs = AdministrativeAct::with(['organizationalUnit.entity', 'creator'])
             ->whereNull('deleted_at')
             ->where(function ($q) {
-                $q->whereNull('attachments')->orWhere('attachments', '[]')->orWhere('attachments', '');
+                $q->whereNull('attachments')
+                  ->orWhere('attachments', '[]')
+                  ->orWhere('attachments', '');
+            })
+            ->where(function ($q) {
+                $q->whereNull('confidential_attachments')
+                  ->orWhere('confidential_attachments', '[]')
+                  ->orWhere('confidential_attachments', '');
             })
             ->get();
 

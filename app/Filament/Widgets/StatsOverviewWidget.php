@@ -29,46 +29,54 @@ class StatsOverviewWidget extends BaseWidget
             $actsQuery->where('organizational_unit_id', $unitId);
         }
 
-        // FUID stats
-        $totalRecords = (clone $recordsQuery)->count();
-        $recordsThisMonth = (clone $recordsQuery)
-            ->whereMonth('created_at', now()->month)
-            ->whereYear('created_at', now()->year)
-            ->count();
-        $recordsLastMonth = (clone $recordsQuery)
-            ->whereMonth('created_at', now()->subMonth()->month)
-            ->whereYear('created_at', now()->subMonth()->year)
-            ->count();
+        // FUID — últimos 7 meses para el mini-gráfico
+        $fuidMonthly = collect(range(6, 0))->map(fn($i) => (clone $recordsQuery)
+            ->whereMonth('created_at', now()->subMonths($i)->month)
+            ->whereYear('created_at', now()->subMonths($i)->year)
+            ->count()
+        )->values()->toArray();
+
+        $totalRecords     = (clone $recordsQuery)->count();
+        $recordsThisMonth = $fuidMonthly[6];
+        $recordsLastMonth = $fuidMonthly[5];
         $fuidPercentChange = $recordsLastMonth > 0
             ? round((($recordsThisMonth - $recordsLastMonth) / $recordsLastMonth) * 100, 1)
-            : 0;
+            : ($recordsThisMonth > 0 ? 100.0 : 0.0);
 
-        // CCD stats
-        $totalActs = (clone $actsQuery)->count();
-        $actsThisMonth = (clone $actsQuery)
-            ->whereMonth('created_at', now()->month)
-            ->whereYear('created_at', now()->year)
-            ->count();
-        $actsLastMonth = (clone $actsQuery)
-            ->whereMonth('created_at', now()->subMonth()->month)
-            ->whereYear('created_at', now()->subMonth()->year)
-            ->count();
+        // CCD — últimos 7 meses para el mini-gráfico
+        $ccdMonthly = collect(range(6, 0))->map(fn($i) => (clone $actsQuery)
+            ->whereMonth('created_at', now()->subMonths($i)->month)
+            ->whereYear('created_at', now()->subMonths($i)->year)
+            ->count()
+        )->values()->toArray();
+
+        $totalActs     = (clone $actsQuery)->count();
+        $actsThisMonth = $ccdMonthly[6];
+        $actsLastMonth = $ccdMonthly[5];
         $ccdPercentChange = $actsLastMonth > 0
             ? round((($actsThisMonth - $actsLastMonth) / $actsLastMonth) * 100, 1)
-            : 0;
+            : ($actsThisMonth > 0 ? 100.0 : 0.0);
 
         $stats = [
             Stat::make('Registros del FUID', number_format($totalRecords))
-                ->description($fuidPercentChange >= 0 ? "+{$fuidPercentChange}% desde el mes pasado" : "{$fuidPercentChange}% desde el mes pasado")
+                ->description(
+                    $fuidPercentChange >= 0
+                        ? "+{$fuidPercentChange}% respecto al mes anterior"
+                        : "{$fuidPercentChange}% respecto al mes anterior"
+                )
                 ->descriptionIcon($fuidPercentChange >= 0 ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
                 ->color('primary')
-                ->chart([7, 3, 4, 5, 6, $recordsLastMonth, $recordsThisMonth]),
+                ->chart($fuidMonthly),
 
             Stat::make('Actos Administrativos', number_format($totalActs))
-                ->description($ccdPercentChange >= 0 ? "+{$ccdPercentChange}% desde el mes pasado" : "{$ccdPercentChange}% desde el mes pasado")
+                ->description(
+                    $ccdPercentChange >= 0
+                        ? "+{$ccdPercentChange}% respecto al mes anterior"
+                        : "{$ccdPercentChange}% respecto al mes anterior"
+                )
                 ->descriptionIcon($ccdPercentChange >= 0 ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
                 ->color('success')
-                ->chart([3, 5, 2, 4, 6, $actsLastMonth, $actsThisMonth]),
+                ->chart($ccdMonthly),
         ];
 
         // Solo super_admin ve estas estadisticas globales

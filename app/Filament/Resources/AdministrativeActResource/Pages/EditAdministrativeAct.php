@@ -10,6 +10,17 @@ class EditAdministrativeAct extends EditRecord
 {
     protected static string $resource = AdministrativeActResource::class;
 
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+
+        if ($this->record->created_at->diffInDays(now()) > 30) {
+            $this->redirect(
+                $this->getResource()::getUrl('view', ['record' => $this->record])
+            );
+        }
+    }
+
     protected function mutateFormDataBeforeSave(array $data): array
     {
         $data['folios'] = $this->countPdfPages($data['attachments'] ?? []);

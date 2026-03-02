@@ -2,6 +2,9 @@
 
 namespace App\Notifications;
 
+use App\Models\AdministrativeAct;
+use Filament\Notifications\Actions\Action as NotificationAction;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -9,37 +12,43 @@ use Illuminate\Support\Collection;
 
 /**
  * Notificación de actos administrativos con PDF pendiente.
+ * Canales: mail + database (campana in-app de Filament).
  * Se envía en los días 15, 25 y cuando vence el plazo de 30 días.
  */
 class PdfDeadlineNotification extends Notification
 {
     use Queueable;
 
-    /**
-     * @param Collection $acts     Actos sin PDF que aplican a este umbral
-     * @param int        $threshold 15, 25 o 30 (vencido)
-     */
     public function __construct(
         public readonly Collection $acts,
         public readonly int $threshold,
     ) {}
 
+    // -------------------------------------------------------------------------
+    // Canales
+    // -------------------------------------------------------------------------
+
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return ['mail', 'database'];
     }
+
+    // -------------------------------------------------------------------------
+    // Correo electrónico
+    // -------------------------------------------------------------------------
 
     public function toMail(object $notifiable): MailMessage
     {
         $isExpired = $this->threshold >= 30;
+        $remaining = 30 - $this->threshold;
 
         $subject = $isExpired
-            ? '[VENCIDO] Actos administrativos sin PDF adjunto - Inventario Documental'
-            : "Aviso: actos administrativos pendientes de PDF ({$this->threshold} días) - Inventario Documental";
+            ? '[VENCIDO] Actos sin PDF adjunto — Inventario Documental'
+            : "[Aviso {$this->threshold} días] Actos pendientes de PDF — Inventario Documental";
 
         $intro = $isExpired
-            ? 'Los siguientes actos administrativos han superado el plazo de **30 días** sin tener un archivo PDF adjunto:'
-            : "Los siguientes actos administrativos llevan **{$this->threshold} días** registrados sin tener un archivo PDF adjunto. Quedan " . (30 - $this->threshold) . ' días para el vencimiento del plazo.';
+            ? 'Los siguientes actos han superado el plazo de **30 días** sin archivo PDF adjunto:'
+            : "Los siguientes actos llevan **{$this->threshold} días** sin PDF. Quedan **{$remaining} día(s)** antes del vencimiento:";
 
         $mail = (new MailMessage)
             ->subject($subject)
@@ -47,20 +56,65 @@ class PdfDeadlineNotification extends Notification
             ->line($intro)
             ->line('');
 
-        foreach ($this->acts as $act) {
-            $days     = $act->pdfDaysRemaining();
-            $label    = $days < 0 ? 'Vencido hace ' . abs($days) . ' día(s)' : $days . ' día(s) restantes';
-            $mail->line(
-                "• **{$act->filing_number}** — {$act->subject} " .
-                "| Unidad: {$act->organizationalUnit?->name} " .
-                "| {$label}"
-            );
+        // Agrupar por unidad organizacional para legibilidad
+        $byUnit = $this->acts->groupBy(
+            fn(AdministrativeAct $act) => $act->organizationalUnit?->name ?? 'Sin unidad'
+        );
+
+        foreach ($byUnit as $unitName => $unitActs) {
+            $mail->line("**{$unitName}**");
+
+            foreach ($unitActs as $act) {
+                $days   = $act->pdfDaysRemaining();
+                $status = $days < 0
+                    ? 'Vencido hace ' . abs($days) . ' día(s)'
+                    : $days . ' día(s) restantes';
+                $actUrl = url('/admin/administrative-acts/' . $act->id);
+
+                $mail->line(
+                    "• [{$act->filing_number}]({$actUrl}) — {$act->subject} | {$status}"
+                );
+            }
+
+            $mail->line('');
         }
 
-        $mail->line('')
-            ->action('Ir a Actos Administrativos', url('/admin/administrative-acts'))
-            ->line('Por favor, adjunta el PDF correspondiente a cada acto antes de que venza el plazo.');
+        $mail->action('Ir a Actos Administrativos', url('/admin/administrative-acts'))
+             ->line('Adjunta el PDF correspondiente a cada acto antes de que venza el plazo.');
 
         return $mail;
+    }
+
+    // -------------------------------------------------------------------------
+    // Notificación in-app (campana de Filament)
+    // -------------------------------------------------------------------------
+
+    public function toDatabase(object $notifiable): array
+    {
+        $isExpired = $this->threshold >= 30;
+        $count     = $this->acts->count();
+        $remaining = 30 - $this->threshold;
+
+        $title = $isExpired
+            ? "Plazo vencido: {$count} acto(s) sin PDF"
+            : "{$count} acto(s) sin PDF — {$this->threshold} días transcurridos";
+
+        $body = $isExpired
+            ? "{$count} acto(s) han superado los 30 días sin adjuntar el documento PDF."
+            : "Quedan {$remaining} día(s) para el vencimiento. Sube el PDF cuanto antes.";
+
+        return FilamentNotification::make()
+            ->title($title)
+            ->body($body)
+            ->icon($isExpired ? 'heroicon-o-exclamation-circle' : 'heroicon-o-clock')
+            ->iconColor($isExpired ? 'danger' : 'warning')
+            ->actions([
+                NotificationAction::make('ver')
+                    ->label('Ver actos pendientes')
+                    ->url(url('/admin/administrative-acts'))
+                    ->color($isExpired ? 'danger' : 'warning')
+                    ->markAsRead(),
+            ])
+            ->getDatabaseMessage();
     }
 }

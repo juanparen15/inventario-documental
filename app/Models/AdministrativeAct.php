@@ -23,6 +23,8 @@ class AdministrativeAct extends Model
         'filing_number',
         'subject',
         'attachments',
+        'confidential_attachments',
+        'late_upload_reason',
         'folios',
         'pdf_notified_days',
         'slug',
@@ -33,8 +35,9 @@ class AdministrativeAct extends Model
 
     protected $casts = [
         'vigencia'          => 'integer',
-        'attachments'       => 'array',
-        'pdf_notified_days' => 'array',
+        'attachments'                => 'array',
+        'confidential_attachments'   => 'array',
+        'pdf_notified_days'          => 'array',
     ];
 
     /** Días restantes hasta el límite de 30 días para subir PDF (negativo = vencido). */
@@ -43,10 +46,10 @@ class AdministrativeAct extends Model
         return 30 - (int) $this->created_at->diffInDays(now());
     }
 
-    /** True si el acto no tiene PDF adjunto. */
+    /** True si el acto no tiene PDF adjunto (ni regular ni confidencial). */
     public function lacksPdf(): bool
     {
-        return empty($this->attachments);
+        return empty($this->attachments) && empty($this->confidential_attachments);
     }
 
     protected static function boot(): void
@@ -76,22 +79,58 @@ class AdministrativeAct extends Model
     }
 
     /**
-     * Genera el consecutivo: {vigencia}.{código_unidad}.{código_serie}.{código_subserie}.{consecutivo}
-     * Ejemplo: 2026.100.01.01.001
-     * Si no tiene subserie: 2026.100.01.001
+     * Deriva las siglas de un nombre eliminando artículos y preposiciones comunes.
+     * Ejemplo: "Alcaldía Municipal de Bogotá" → "AMB"
+     * Si no queda ninguna inicial se toman los 3 primeros caracteres en mayúscula.
+     */
+    private static function siglaFromName(string $name): string
+    {
+        $stopWords = ['de', 'del', 'la', 'el', 'los', 'las', 'y', 'e', 'o', 'u', 'a', 'en', 'con', 'por', 'para', 'al'];
+        $words = preg_split('/\s+/', trim($name));
+        $initials = '';
+        foreach ($words as $word) {
+            $lower = mb_strtolower($word);
+            if ($word !== '' && !in_array($lower, $stopWords)) {
+                $initials .= mb_strtoupper(mb_substr($word, 0, 1));
+            }
+        }
+        return $initials ?: mb_strtoupper(mb_substr($name, 0, 3));
+    }
+
+    /**
+     * Resuelve las siglas de la entidad asociada a una unidad organizacional.
+     * Usa entity->code si existe; si no, las deriva del nombre de la entidad.
+     */
+    private static function resolveEntityCode(OrganizationalUnit $unit): string
+    {
+        $entity = $unit->entity;
+        if (!$entity) {
+            return 'XXX';
+        }
+        if (!empty($entity->code)) {
+            return $entity->code;
+        }
+        return static::siglaFromName($entity->name);
+    }
+
+    /**
+     * Genera el consecutivo: {vigencia}.{siglas_entidad}.{código_serie}.{código_subserie}.{consecutivo}
+     * Ejemplo: 2026.AMB.01.01.001
+     * Si no tiene subserie: 2026.AMB.01.001
      * El consecutivo se reinicia con cada nueva vigencia.
      */
     public static function generateFilingNumber($model): string
     {
-        $vigencia = $model->vigencia ?? (int) date('Y');
-        $unitCode = $model->organizationalUnit?->code ?? 'XXX';
-        $seriesCode = $model->documentarySeries?->code ?? '00';
+        $vigencia    = $model->vigencia ?? (int) date('Y');
+        $unit        = $model->organizationalUnit;
+        $entityCode  = $unit ? static::resolveEntityCode($unit) : 'XXX';
+        $seriesCode  = $model->documentarySeries?->code ?? '00';
         $subseriesCode = $model->documentarySubseries?->code;
 
         if ($subseriesCode) {
-            $prefix = "{$vigencia}.{$unitCode}.{$seriesCode}.{$subseriesCode}";
+            $prefix = "{$vigencia}.{$entityCode}.{$seriesCode}.{$subseriesCode}";
         } else {
-            $prefix = "{$vigencia}.{$unitCode}.{$seriesCode}";
+            $prefix = "{$vigencia}.{$entityCode}.{$seriesCode}";
         }
 
         $lastNumber = static::withTrashed()
@@ -118,23 +157,23 @@ class AdministrativeAct extends Model
             return null;
         }
 
-        $vigencia = $vigencia ?? (int) date('Y');
-        $unit = OrganizationalUnit::find($unitId);
-        $series = DocumentarySeries::find($seriesId);
+        $vigencia  = $vigencia ?? (int) date('Y');
+        $unit      = OrganizationalUnit::with('entity')->find($unitId);
+        $series    = DocumentarySeries::find($seriesId);
         $subseries = $subseriesId ? DocumentarySubseries::find($subseriesId) : null;
 
         if (!$unit || !$series) {
             return null;
         }
 
-        $unitCode = $unit->code;
-        $seriesCode = $series->code;
+        $entityCode    = static::resolveEntityCode($unit);
+        $seriesCode    = $series->code;
         $subseriesCode = $subseries?->code;
 
         if ($subseriesCode) {
-            $prefix = "{$vigencia}.{$unitCode}.{$seriesCode}.{$subseriesCode}";
+            $prefix = "{$vigencia}.{$entityCode}.{$seriesCode}.{$subseriesCode}";
         } else {
-            $prefix = "{$vigencia}.{$unitCode}.{$seriesCode}";
+            $prefix = "{$vigencia}.{$entityCode}.{$seriesCode}";
         }
 
         $lastNumber = static::withTrashed()

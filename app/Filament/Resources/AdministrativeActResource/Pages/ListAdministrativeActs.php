@@ -8,7 +8,9 @@ use Filament\Actions;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
+use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use pxlrbt\FilamentExcel\Actions\Pages\ExportAction;
@@ -115,14 +117,24 @@ class ListAdministrativeActs extends ListRecords
 
             ExportAction::make()
                 ->label('Exportar')
-                ->visible(fn() => auth()->user()?->hasRole('super_admin'))
+                ->authorize(fn() => true)
                 ->extraAttributes([
                     'data-tour' => 'export-button-acts',
                 ])
                 ->exports([
                     ExcelExport::make()
                         ->fromTable()
-                        ->withFilename('actos_administrativos_' . date('Y-m-d'))
+                        ->withFilename(function ($livewire) {
+                            $tabLabels = [
+                                'sin_pdf'    => 'sin-pdf',
+                                'vencidos'   => 'vencidos',
+                                'por_vencer' => 'por-vencer',
+                                'esta_semana'=> 'esta-semana',
+                            ];
+                            $tab = $livewire->activeTab ?? null;
+                            $suffix = ($tab && isset($tabLabels[$tab])) ? '_' . $tabLabels[$tab] : '';
+                            return 'actos_administrativos' . $suffix . '_' . date('Y-m-d');
+                        })
                         ->withWriterType(\Maatwebsite\Excel\Excel::XLSX)
                         ->withColumns([
                             Column::make('vigencia')->heading('Vigencia'),
@@ -130,11 +142,81 @@ class ListAdministrativeActs extends ListRecords
                             Column::make('filing_number')->heading('Consecutivo'),
                             Column::make('subject')->heading('Asunto'),
                             Column::make('organizationalUnit.name')->heading('Unidad Organizacional'),
-                            Column::make('user.email')->heading('Usuario'),
+                            Column::make('user.name')->heading('Registrado por'),
+                            Column::make('attachments')
+                                ->heading('Estado PDF')
+                                ->formatStateUsing(function ($state, $record) {
+                                    $hasPdf = !empty($record->attachments) || !empty($record->confidential_attachments);
+                                    if ($hasPdf) return 'Con PDF';
+                                    $days = $record->created_at->diffInDays(now());
+                                    return $days > 30 ? 'Vencido (sin PDF)' : "Sin PDF ({$days} días)";
+                                }),
+                            Column::make('late_upload_reason')->heading('Razón de retraso PDF'),
+                            Column::make('folios')->heading('Folios'),
                             Column::make('notes')->heading('Notas'),
                             Column::make('created_at')->heading('Fecha de Registro'),
                         ]),
                 ]),
+        ];
+    }
+
+    public function getTabs(): array
+    {
+        // Cierre reutilizable: registros sin ningún PDF adjunto (regular ni confidencial).
+        // IMPORTANTE: el parámetro debe llamarse $query para que Filament lo inyecte correctamente
+        // (Tab::modifyQuery pasa ['query' => $builder] y evalúa por nombre de parámetro).
+        $noPdf = fn(Builder $query): Builder => $query
+            ->where(fn(Builder $inner) => $inner
+                ->whereNull('attachments')
+                ->orWhere('attachments', '[]')
+                ->orWhere('attachments', ''))
+            ->where(fn(Builder $inner) => $inner
+                ->whereNull('confidential_attachments')
+                ->orWhere('confidential_attachments', '[]')
+                ->orWhere('confidential_attachments', ''));
+
+        return [
+            'todos' => Tab::make('Todos')
+                ->icon('heroicon-o-document-text'),
+
+            'sin_pdf' => Tab::make('Sin PDF')
+                ->icon('heroicon-o-document-minus')
+                ->badge(fn() => $noPdf(AdministrativeActResource::getEloquentQuery())->count() ?: null)
+                ->badgeColor('warning')
+                ->modifyQueryUsing($noPdf),
+
+            'vencidos' => Tab::make('Vencidos')
+                ->icon('heroicon-o-exclamation-circle')
+                ->badge(fn() => $noPdf(
+                    AdministrativeActResource::getEloquentQuery()
+                        ->where('created_at', '<=', now()->subDays(30))
+                )->count() ?: null)
+                ->badgeColor('danger')
+                ->modifyQueryUsing(fn(Builder $query) => $noPdf(
+                    $query->where('created_at', '<=', now()->subDays(30))
+                )),
+
+            'por_vencer' => Tab::make('Por vencer')
+                ->icon('heroicon-o-clock')
+                ->badge(fn() => $noPdf(
+                    AdministrativeActResource::getEloquentQuery()
+                        ->where('created_at', '>=', now()->subDays(29)->startOfDay())
+                        ->where('created_at', '<=', now()->subDays(23)->endOfDay())
+                )->count() ?: null)
+                ->badgeColor('warning')
+                ->modifyQueryUsing(fn(Builder $query) => $noPdf(
+                    $query->where('created_at', '>=', now()->subDays(29)->startOfDay())
+                          ->where('created_at', '<=', now()->subDays(23)->endOfDay())
+                )),
+
+            'esta_semana' => Tab::make('Esta semana')
+                ->icon('heroicon-o-calendar-days')
+                ->badge(fn() => AdministrativeActResource::getEloquentQuery()
+                    ->where('created_at', '>=', now()->startOfWeek())
+                    ->count() ?: null)
+                ->badgeColor('info')
+                ->modifyQueryUsing(fn(Builder $query) => $query
+                    ->where('created_at', '>=', now()->startOfWeek())),
         ];
     }
 

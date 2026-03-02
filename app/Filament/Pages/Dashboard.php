@@ -6,6 +6,7 @@ use App\Filament\Widgets\ActsByClassificationChart;
 use App\Filament\Widgets\DocumentsByUnitComparisonChart;
 use App\Filament\Widgets\LatestActsWidget;
 use App\Filament\Widgets\LatestRecordsWidget;
+use App\Filament\Widgets\PdfComplianceWidget;
 use App\Filament\Widgets\RecordsBySeriesChart;
 use App\Filament\Widgets\RecordsTimelineChart;
 use App\Filament\Widgets\StatsOverviewWidget;
@@ -38,6 +39,7 @@ class Dashboard extends BaseDashboard
     {
         return [
             StatsOverviewWidget::class,
+            PdfComplianceWidget::class,
             RecordsBySeriesChart::class,
             ActsByClassificationChart::class,
             DocumentsByUnitComparisonChart::class,
