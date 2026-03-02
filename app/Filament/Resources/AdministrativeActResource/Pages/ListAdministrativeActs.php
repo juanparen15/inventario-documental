@@ -168,12 +168,10 @@ class ListAdministrativeActs extends ListRecords
         $noPdf = fn(Builder $query): Builder => $query
             ->where(fn(Builder $inner) => $inner
                 ->whereNull('attachments')
-                ->orWhere('attachments', '[]')
-                ->orWhere('attachments', ''))
+                ->orWhereRaw('JSON_LENGTH(attachments) = 0'))
             ->where(fn(Builder $inner) => $inner
                 ->whereNull('confidential_attachments')
-                ->orWhere('confidential_attachments', '[]')
-                ->orWhere('confidential_attachments', ''));
+                ->orWhereRaw('JSON_LENGTH(confidential_attachments) = 0'));
 
         return [
             'todos' => Tab::make('Todos')

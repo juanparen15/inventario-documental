@@ -33,13 +33,11 @@ class CheckPdfDeadlines extends Command
             ->whereNull('deleted_at')
             ->where(function ($q) {
                 $q->whereNull('attachments')
-                  ->orWhere('attachments', '[]')
-                  ->orWhere('attachments', '');
+                  ->orWhereRaw('JSON_LENGTH(attachments) = 0');
             })
             ->where(function ($q) {
                 $q->whereNull('confidential_attachments')
-                  ->orWhere('confidential_attachments', '[]')
-                  ->orWhere('confidential_attachments', '');
+                  ->orWhereRaw('JSON_LENGTH(confidential_attachments) = 0');
             })
             ->get();
 

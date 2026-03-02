@@ -253,7 +253,7 @@ class AdministrativeActResource extends Resource
                     ]),
 
                 Forms\Components\Section::make('Documentos Confidenciales')
-                    ->description('Solo tú y usuarios de tu unidad pueden ver estos documentos. Los supervisores y administradores no tienen acceso.')
+                    ->description('Solo tú, usuarios de tu unidad y el administrador pueden ver estos documentos. Los supervisores no tienen acceso.')
                     ->icon('heroicon-o-lock-closed')
                     ->iconColor('warning')
                     ->collapsible()
@@ -269,8 +269,8 @@ class AdministrativeActResource extends Resource
                             ->reorderable()
                             ->live(),
                     ])
-                    ->hidden(fn() => auth()->user()?->hasAnyRole(['super_admin', 'supervisor']))
-                    ->dehydrated(fn() => !auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
+                    ->hidden(fn() => auth()->user()?->hasRole('supervisor'))
+                    ->dehydrated(fn() => !auth()->user()?->hasRole('supervisor')),
 
                 Forms\Components\Section::make('Registro de retraso')
                     ->icon('heroicon-o-clock')
@@ -454,19 +454,36 @@ class AdministrativeActResource extends Resource
                     ->modalHeading('Archivos PDF Adjuntos')
                     ->modalWidth('5xl')
                     ->modalContent(function (AdministrativeAct $record) {
-                        $attachments = $record->attachments ?? [];
-                        $isAdmin = auth()->user()?->hasAnyRole(['super_admin', 'supervisor']);
-                        $confidential = $isAdmin ? [] : ($record->confidential_attachments ?? []);
-                        $confidentialCount = count($record->confidential_attachments ?? []);
+                        $attachments      = $record->attachments ?? [];
+                        $isSuperAdmin     = auth()->user()?->hasRole('super_admin');
+                        $isSupervisor     = auth()->user()?->hasRole('supervisor');
+                        $confidentialAll  = $record->confidential_attachments ?? [];
+                        $confidentialCount = count($confidentialAll);
 
-                        if (empty($attachments) && empty($confidential) && (!$isAdmin || $confidentialCount === 0)) {
+                        // Supervisor no puede ver confidenciales
+                        $confidential = $isSupervisor ? [] : $confidentialAll;
+
+                        // Registrar actividad cuando super_admin consulta archivos confidenciales
+                        if ($isSuperAdmin && $confidentialCount > 0) {
+                            activity('inventory')
+                                ->performedOn($record)
+                                ->causedBy(auth()->user())
+                                ->event('confidential_viewed')
+                                ->withProperties([
+                                    'ip'                    => request()->ip(),
+                                    'archivos_confidenciales' => $confidentialCount,
+                                ])
+                                ->log('Super admin consultó archivos confidenciales');
+                        }
+
+                        if (empty($attachments) && empty($confidential) && (!$isSupervisor || $confidentialCount === 0)) {
                             return view('filament.components.no-attachments');
                         }
                         return view('filament.components.attachments-list', [
                             'attachments'       => $attachments,
                             'confidential'      => $confidential,
-                            'confidentialCount' => $isAdmin ? $confidentialCount : 0,
-                            'isAdmin'           => $isAdmin,
+                            'confidentialCount' => $isSupervisor ? $confidentialCount : 0,
+                            'isAdmin'           => $isSupervisor,
                         ]);
                     })
                     ->modalSubmitAction(false)
@@ -489,7 +506,7 @@ class AdministrativeActResource extends Resource
                             ->helperText('Activa esta opción si el documento debe ser privado para tu unidad.')
                             ->default(false)
                             ->live()
-                            ->hidden(fn() => auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
+                            ->hidden(fn() => auth()->user()?->hasRole('supervisor')),
 
                         Forms\Components\FileUpload::make('regular_files')
                             ->label('Documentos PDF')
@@ -497,8 +514,8 @@ class AdministrativeActResource extends Resource
                             ->multiple()
                             ->acceptedFileTypes(['application/pdf'])
                             ->maxSize(20480)
-                            ->hidden(fn(Get $get) => $get('is_confidential') && !auth()->user()?->hasAnyRole(['super_admin', 'supervisor']))
-                            ->required(fn(Get $get) => !$get('is_confidential') || auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
+                            ->hidden(fn(Get $get) => $get('is_confidential') && !auth()->user()?->hasRole('supervisor'))
+                            ->required(fn(Get $get) => !$get('is_confidential') || auth()->user()?->hasRole('supervisor')),
 
                         Forms\Components\FileUpload::make('confidential_files')
                             ->label('Documentos PDF (Confidencial 🔒)')
@@ -506,8 +523,8 @@ class AdministrativeActResource extends Resource
                             ->multiple()
                             ->acceptedFileTypes(['application/pdf'])
                             ->maxSize(20480)
-                            ->hidden(fn(Get $get) => !$get('is_confidential') || auth()->user()?->hasAnyRole(['super_admin', 'supervisor']))
-                            ->required(fn(Get $get) => $get('is_confidential') && !auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
+                            ->hidden(fn(Get $get) => !$get('is_confidential') || auth()->user()?->hasRole('supervisor'))
+                            ->required(fn(Get $get) => $get('is_confidential') && !auth()->user()?->hasRole('supervisor')),
 
                         Forms\Components\Textarea::make('late_upload_reason')
                             ->label('Razón del retraso')
@@ -518,7 +535,7 @@ class AdministrativeActResource extends Resource
                     ])
                     ->action(function (AdministrativeAct $record, array $data): void {
                         $isConfidential = ($data['is_confidential'] ?? false)
-                            && !auth()->user()?->hasAnyRole(['super_admin', 'supervisor']);
+                            && !auth()->user()?->hasRole('supervisor');
 
                         if ($isConfidential) {
                             $files = array_values(array_filter($data['confidential_files'] ?? []));

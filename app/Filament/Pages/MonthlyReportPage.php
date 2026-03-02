@@ -87,7 +87,7 @@ class MonthlyReportPage extends Page
         return AdministrativeAct::with(['organizationalUnit.entity'])
             ->whereNull('deleted_at')
             ->where(function ($q) {
-                $q->whereNull('attachments')->orWhere('attachments', '[]')->orWhere('attachments', '');
+                $q->whereNull('attachments')->orWhereRaw('JSON_LENGTH(attachments) = 0');
             })
             ->orderBy('created_at')
             ->get();

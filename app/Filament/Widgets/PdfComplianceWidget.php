@@ -30,12 +30,10 @@ class PdfComplianceWidget extends BaseWidget
         $noPdf = fn($q) => $q
             ->where(fn($i) => $i
                 ->whereNull('attachments')
-                ->orWhere('attachments', '[]')
-                ->orWhere('attachments', ''))
+                ->orWhereRaw('JSON_LENGTH(attachments) = 0'))
             ->where(fn($i) => $i
                 ->whereNull('confidential_attachments')
-                ->orWhere('confidential_attachments', '[]')
-                ->orWhere('confidential_attachments', ''));
+                ->orWhereRaw('JSON_LENGTH(confidential_attachments) = 0'));
 
         $total      = (clone $base)->count();
         $sinPdf     = (clone $base)->tap($noPdf)->count();

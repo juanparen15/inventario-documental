@@ -224,6 +224,28 @@ class CreateAdministrativeAct extends CreateRecord
                         ->helperText('Calculado automáticamente a partir de los PDF adjuntos.')
                         ->extraAttributes(['data-tour' => 'act-folios'])
                         ->columnSpanFull(),
+
+                    Forms\Components\Section::make('Documentos Confidenciales')
+                        ->description('Solo tú, usuarios de tu unidad y el administrador pueden ver estos documentos. Los supervisores no tienen acceso.')
+                        ->icon('heroicon-o-lock-closed')
+                        ->iconColor('warning')
+                        ->collapsible()
+                        ->schema([
+                            Forms\Components\FileUpload::make('confidential_attachments')
+                                ->label('Archivos Confidenciales (PDF)')
+                                ->directory('administrative-acts-confidential')
+                                ->multiple()
+                                ->acceptedFileTypes(['application/pdf'])
+                                ->maxSize(20480)
+                                ->downloadable()
+                                ->openable()
+                                ->reorderable()
+                                ->live()
+                                ->columnSpanFull(),
+                        ])
+                        ->hidden(fn () => auth()->user()?->hasRole('supervisor'))
+                        ->dehydrated(fn () => ! auth()->user()?->hasRole('supervisor'))
+                        ->columnSpanFull(),
                 ]),
         ];
     }
