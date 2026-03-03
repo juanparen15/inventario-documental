@@ -68,7 +68,7 @@ class StatsOverviewWidget extends BaseWidget
                 ->color('primary')
                 ->chart($fuidMonthly),
 
-            Stat::make('Actos Administrativos', number_format($totalActs))
+            Stat::make('Sistema Unificado de Registro', number_format($totalActs))
                 ->description(
                     $ccdPercentChange >= 0
                         ? "+{$ccdPercentChange}% respecto al mes anterior"

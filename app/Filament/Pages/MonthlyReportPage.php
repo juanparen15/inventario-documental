@@ -2,9 +2,7 @@
 
 namespace App\Filament\Pages;
 
-use App\Console\Commands\SendMonthlyReport;
 use App\Models\AdministrativeAct;
-use App\Models\Entity;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -13,19 +11,17 @@ use Filament\Pages\Page;
 use Illuminate\Support\Facades\Artisan;
 
 /**
- * Página de informe mensual de actos administrativos.
- * Visible solo para super_admin y supervisor.
+ * Informe mensual de actos administrativos.
+ * Acceso: super_admin y supervisor.
  */
 class MonthlyReportPage extends Page
 {
-    protected static ?string $navigationIcon  = 'heroicon-o-chart-bar';
+    protected static ?string $navigationIcon  = 'heroicon-o-chart-bar-square';
     protected static ?string $navigationLabel = 'Informe Mensual';
     protected static ?string $navigationGroup = 'Documentos';
-    protected static ?string $title           = 'Informe Mensual de Actos Administrativos';
     protected static ?int    $navigationSort  = 10;
-    protected static ?string $slug             = 'monthly-report';
-
-    protected static string $view = 'filament.pages.monthly-report';
+    protected static ?string $slug            = 'monthly-report';
+    protected static string  $view            = 'filament.pages.monthly-report';
 
     public int $selectedMonth;
     public int $selectedYear;
@@ -40,13 +36,37 @@ class MonthlyReportPage extends Page
         return url('/admin/monthly-report');
     }
 
-    public function mount(): void
+    public function getTitle(): string
     {
-        $this->selectedMonth = (int) Carbon::now()->month;
-        $this->selectedYear  = (int) Carbon::now()->year;
+        return 'Informe Mensual — ' . mb_strtoupper($this->getMonthLabel());
     }
 
-    // ── Datos del informe ─────────────────────────────────────────────────
+    public function mount(): void
+    {
+        $this->selectedMonth = (int) now()->month;
+        $this->selectedYear  = (int) now()->year;
+    }
+
+    // ── Navegación de período ─────────────────────────────────────────────
+
+    public function prevMonth(): void
+    {
+        $date = Carbon::createFromDate($this->selectedYear, $this->selectedMonth, 1)->subMonth();
+        $this->selectedMonth = $date->month;
+        $this->selectedYear  = $date->year;
+    }
+
+    public function nextMonth(): void
+    {
+        $date = Carbon::createFromDate($this->selectedYear, $this->selectedMonth, 1)->addMonth();
+        if ($date->startOfMonth()->isFuture()) {
+            return;
+        }
+        $this->selectedMonth = $date->month;
+        $this->selectedYear  = $date->year;
+    }
+
+    // ── Datos para la vista (distribución y pendientes) ───────────────────
 
     public function getStats(): array
     {
@@ -62,33 +82,23 @@ class MonthlyReportPage extends Page
 
         $stats = [];
         foreach ($acts as $act) {
-            $entity   = $act->organizationalUnit?->entity?->name  ?? 'Sin entidad';
-            $unit     = $act->organizationalUnit?->name           ?? 'Sin unidad';
+            $entity   = $act->organizationalUnit?->entity?->name ?? 'Sin entidad';
+            $unit     = $act->organizationalUnit?->name          ?? 'Sin unidad';
             $subserie = $act->documentarySubseries?->name
                 ?? $act->documentarySeries?->name
                 ?? 'Sin clasificación';
-
             $stats[$entity][$unit][$subserie] = ($stats[$entity][$unit][$subserie] ?? 0) + 1;
         }
 
         return $stats;
     }
 
-    public function getTotalActs(): int
-    {
-        return AdministrativeAct::whereNull('deleted_at')
-            ->whereYear('created_at', $this->selectedYear)
-            ->whereMonth('created_at', $this->selectedMonth)
-            ->count();
-    }
-
     public function getPendingPdf()
     {
         return AdministrativeAct::with(['organizationalUnit.entity'])
             ->whereNull('deleted_at')
-            ->where(function ($q) {
-                $q->whereNull('attachments')->orWhereRaw('JSON_LENGTH(attachments) = 0');
-            })
+            ->where(fn($q) => $q->whereNull('attachments')->orWhereRaw('JSON_LENGTH(attachments) = 0'))
+            ->where(fn($q) => $q->whereNull('confidential_attachments')->orWhereRaw('JSON_LENGTH(confidential_attachments) = 0'))
             ->orderBy('created_at')
             ->get();
     }
@@ -100,15 +110,36 @@ class MonthlyReportPage extends Page
             ->isoFormat('MMMM YYYY');
     }
 
+    public function isCurrentMonth(): bool
+    {
+        return $this->selectedMonth === (int) now()->month
+            && $this->selectedYear  === (int) now()->year;
+    }
+
+    // ── URLs exportación ──────────────────────────────────────────────────
+
+    public function getExcelUrl(): string
+    {
+        return route('monthly-report.excel', ['month' => $this->selectedMonth, 'year' => $this->selectedYear]);
+    }
+
     // ── Acciones del encabezado ───────────────────────────────────────────
 
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('changeMonth')
-                ->label('Cambiar período')
-                ->icon('heroicon-o-calendar')
+            Action::make('prevMonth')
+                ->label('Anterior')
+                ->icon('heroicon-o-chevron-left')
                 ->color('gray')
+                ->size('sm')
+                ->action(fn () => $this->prevMonth()),
+
+            Action::make('changeMonth')
+                ->label(fn () => mb_strtoupper($this->getMonthLabel()))
+                ->icon('heroicon-o-calendar-days')
+                ->color('primary')
+                ->size('sm')
                 ->form([
                     Select::make('month')
                         ->label('Mes')
@@ -122,38 +153,51 @@ class MonthlyReportPage extends Page
                         ->required(),
                     Select::make('year')
                         ->label('Año')
-                        ->options(function () {
-                            $years = [];
-                            for ($y = 2024; $y <= now()->year + 1; $y++) {
-                                $years[$y] = (string) $y;
-                            }
-                            return $years;
-                        })
+                        ->options(fn () => collect(range(2024, now()->year))
+                            ->mapWithKeys(fn ($y) => [$y => (string) $y])
+                            ->all()
+                        )
                         ->default($this->selectedYear)
                         ->required(),
                 ])
-                ->action(function (array $data) {
+                ->action(function (array $data): void {
                     $this->selectedMonth = (int) $data['month'];
                     $this->selectedYear  = (int) $data['year'];
                 }),
 
+            Action::make('nextMonth')
+                ->label('Siguiente')
+                ->icon('heroicon-o-chevron-right')
+                ->iconPosition('after')
+                ->color('gray')
+                ->size('sm')
+                ->disabled(fn () => $this->isCurrentMonth())
+                ->action(fn () => $this->nextMonth()),
+
+            Action::make('exportExcel')
+                ->label('Excel')
+                ->icon('heroicon-o-table-cells')
+                ->color('success')
+                ->size('sm')
+                ->url(fn () => $this->getExcelUrl()),
+
             Action::make('sendReport')
-                ->label('Enviar informe por correo')
+                ->label('Enviar por correo')
                 ->icon('heroicon-o-envelope')
-                ->color('primary')
+                ->color('info')
+                ->size('sm')
                 ->requiresConfirmation()
                 ->modalHeading('Enviar informe mensual')
-                ->modalDescription(fn () => "Se enviará el informe de {$this->getMonthLabel()} a todos los usuarios con rol super_admin y supervisor.")
+                ->modalDescription(fn () => 'Se enviará el informe de ' . $this->getMonthLabel() . ' a todos los usuarios con rol super_admin y supervisor.')
                 ->modalSubmitActionLabel('Enviar')
-                ->action(function () {
+                ->action(function (): void {
                     Artisan::call('acts:monthly-report', [
                         '--month' => $this->selectedMonth,
                         '--year'  => $this->selectedYear,
                     ]);
-
                     Notification::make()
                         ->title('Informe enviado')
-                        ->body("El informe de {$this->getMonthLabel()} fue enviado correctamente por correo.")
+                        ->body('El informe de ' . $this->getMonthLabel() . ' fue enviado correctamente.')
                         ->success()
                         ->send();
                 }),

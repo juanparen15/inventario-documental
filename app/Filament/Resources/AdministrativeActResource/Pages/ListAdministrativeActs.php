@@ -52,7 +52,7 @@ class ListAdministrativeActs extends ListRecords
                     $spreadsheet = AdministrativeActImporter::generateTemplate(auth()->user());
                     $writer = new Xlsx($spreadsheet);
 
-                    $fileName = 'plantilla_actos_administrativos_' . date('Y-m-d') . '.xlsx';
+                    $fileName = 'plantilla_sistema_unificado_' . date('Y-m-d') . '.xlsx';
                     $tempFile = tempnam(sys_get_temp_dir(), 'template');
                     $writer->save($tempFile);
 
@@ -83,7 +83,7 @@ class ListAdministrativeActs extends ListRecords
                         ->required()
                         ->helperText('Formatos aceptados: .xlsx, .xls. Descargue la plantilla para ver el formato correcto.'),
                 ])
-                ->modalHeading('Importar Actos Administrativos')
+                ->modalHeading('Importar al Sistema Unificado de Registro')
                 ->modalDescription('Seleccione un archivo Excel con los datos a importar. Los campos marcados con * son obligatorios.')
                 ->modalSubmitActionLabel('Importar')
                 ->action(function (array $data) {
@@ -109,7 +109,7 @@ class ListAdministrativeActs extends ListRecords
                     } else {
                         Notification::make()
                             ->title('Importación exitosa')
-                            ->body("Se importaron {$result['success']} actos administrativos correctamente.")
+                            ->body("Se importaron {$result['success']} registros correctamente.")
                             ->success()
                             ->send();
                     }
@@ -133,7 +133,7 @@ class ListAdministrativeActs extends ListRecords
                             ];
                             $tab = $livewire->activeTab ?? null;
                             $suffix = ($tab && isset($tabLabels[$tab])) ? '_' . $tabLabels[$tab] : '';
-                            return 'actos_administrativos' . $suffix . '_' . date('Y-m-d');
+                            return 'sistema_unificado_registro' . $suffix . '_' . date('Y-m-d');
                         })
                         ->withWriterType(\Maatwebsite\Excel\Excel::XLSX)
                         ->withColumns([

@@ -43,12 +43,12 @@ class PdfDeadlineNotification extends Notification
         $remaining = 30 - $this->threshold;
 
         $subject = $isExpired
-            ? '[VENCIDO] Actos sin PDF adjunto — Inventario Documental'
-            : "[Aviso {$this->threshold} días] Actos pendientes de PDF — Inventario Documental";
+            ? '[VENCIDO] Registros sin PDF adjunto — Sistema Unificado de Registro'
+            : "[Aviso {$this->threshold} días] Registros pendientes de PDF — Sistema Unificado de Registro";
 
         $intro = $isExpired
-            ? 'Los siguientes actos han superado el plazo de **30 días** sin archivo PDF adjunto:'
-            : "Los siguientes actos llevan **{$this->threshold} días** sin PDF. Quedan **{$remaining} día(s)** antes del vencimiento:";
+            ? 'Los siguientes registros han superado el plazo de **30 días** sin archivo PDF adjunto:'
+            : "Los siguientes registros llevan **{$this->threshold} días** sin PDF. Quedan **{$remaining} día(s)** antes del vencimiento:";
 
         $mail = (new MailMessage)
             ->subject($subject)
@@ -79,8 +79,8 @@ class PdfDeadlineNotification extends Notification
             $mail->line('');
         }
 
-        $mail->action('Ir a Actos Administrativos', url('/admin/administrative-acts'))
-             ->line('Adjunta el PDF correspondiente a cada acto antes de que venza el plazo.');
+        $mail->action('Ir al Sistema Unificado de Registro', url('/admin/administrative-acts'))
+             ->line('Adjunta el PDF correspondiente a cada registro antes de que venza el plazo.');
 
         return $mail;
     }

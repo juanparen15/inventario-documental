@@ -159,7 +159,7 @@ class CreateAdministrativeAct extends CreateRecord
 
             // ─── Paso 2: Detalle del acto ─────────────────────────────────────
             Step::make('Detalle')
-                ->description('Objeto y notas del acto administrativo')
+                ->description('Objeto y notas del registro')
                 ->icon('heroicon-o-document-text')
                 ->schema([
 

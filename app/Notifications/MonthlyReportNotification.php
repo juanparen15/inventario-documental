@@ -42,9 +42,9 @@ class MonthlyReportNotification extends Notification
             ->isoFormat('MMMM YYYY');
 
         $mail = (new MailMessage)
-            ->subject("Informe mensual de Actos Administrativos — {$monthName}")
+            ->subject("Informe mensual del Sistema Unificado de Registro — {$monthName}")
             ->greeting('Hola, ' . $notifiable->name)
-            ->line("A continuación el resumen de actos administrativos registrados en **{$monthName}**:")
+            ->line("A continuación el resumen de registros del Sistema Unificado en **{$monthName}**:")
             ->line("**Total de actos registrados:** {$this->totalActs}")
             ->line('---')
             ->line('**Detalle por entidad y unidad:**')

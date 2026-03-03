@@ -52,7 +52,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             if (
-                text.includes("Actos Administrativos") ||
+                text.includes("Sistema unificado de registro") ||
                 href.includes("administrative-acts")
             ) {
                 link.setAttribute("data-tour", "menu-actos");
@@ -93,7 +93,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     popover: {
                         title: "Bienvenido al Inventario Documental",
                         description:
-                            "Este sistema te permite gestionar el inventario documental de tu entidad: registros FUID, series, subseries y actos administrativos. Te explicaremos paso a paso como funciona.",
+                            "Este sistema te permite gestionar el inventario documental de tu entidad: registros FUID, series, subseries y el Sistema Unificado de Registro. Te explicaremos paso a paso como funciona.",
                     },
                 },
                 {
@@ -108,9 +108,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 {
                     element: "[data-tour='menu-actos']",
                     popover: {
-                        title: "Actos Administrativos",
+                        title: "Sistema Unificado de Registro",
                         description:
-                            "Aqui registras los actos administrativos: resoluciones, decretos, circulares y demas documentos oficiales de tu entidad.",
+                            "Aqui registras los documentos del Sistema Unificado: resoluciones, decretos, circulares y demas documentos oficiales de tu entidad.",
                         side: "right",
                     },
                 },
@@ -355,7 +355,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // ========================================================
-    // TOUR 4: LISTA DE ACTOS ADMINISTRATIVOS
+    // TOUR 4: SISTEMA UNIFICADO DE REGISTRO
     // ========================================================
     if (isActsList) {
         var tourActsList = driverFn({
@@ -367,17 +367,17 @@ document.addEventListener("DOMContentLoaded", function () {
             steps: [
                 {
                     popover: {
-                        title: "Actos Administrativos",
+                        title: "Sistema Unificado de Registro",
                         description:
-                            "Aqui gestionas los actos administrativos de tu entidad: resoluciones, decretos, acuerdos, circulares y demas documentos oficiales. Cada registro guarda el acto con su clasificacion y archivos adjuntos.",
+                            "Aqui gestionas el Sistema Unificado de Registro de tu entidad: resoluciones, decretos, acuerdos, circulares y demas documentos oficiales. Cada registro guarda el documento con su clasificacion y archivos adjuntos.",
                     },
                 },
                 {
                     element: ".fi-ta-table",
                     popover: {
-                        title: "Tu lista de actos",
+                        title: "Tu lista de registros",
                         description:
-                            "Cada fila muestra: numero de consecutivo, tipo de acto, objeto/asunto, unidad organizacional y fecha. Puedes hacer clic en una fila para ver el detalle completo.",
+                            "Cada fila muestra: numero de consecutivo, tipo de registro, objeto/asunto, unidad organizacional y fecha. Puedes hacer clic en una fila para ver el detalle completo.",
                         side: "top",
                     },
                 },
@@ -386,16 +386,16 @@ document.addEventListener("DOMContentLoaded", function () {
                     popover: {
                         title: "Buscar y filtrar",
                         description:
-                            "Busca actos por consecutivo o asunto. Usa los filtros para buscar por tipo de acto, unidad organizacional o rango de fechas.",
+                            "Busca registros por consecutivo o asunto. Usa los filtros para buscar por tipo, unidad organizacional o rango de fechas.",
                         side: "bottom",
                     },
                 },
                 {
                     element: "[data-tour='create-button-acts']",
                     popover: {
-                        title: "Crear nuevo acto",
+                        title: "Crear nuevo registro",
                         description:
-                            "Haz clic aqui para registrar un nuevo acto administrativo. Se abrira un formulario donde podras ingresar toda la informacion y adjuntar los documentos PDF.",
+                            "Haz clic aqui para crear un nuevo registro en el Sistema Unificado. Se abrira un formulario donde podras ingresar toda la informacion y adjuntar los documentos PDF.",
                         side: "bottom",
                     },
                 },
@@ -412,7 +412,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     popover: {
                         title: "¡Listo!",
                         description:
-                            "Ya conoces el modulo de actos administrativos. Crea tu primer acto o explora los existentes.",
+                            "Ya conoces el Sistema Unificado de Registro. Crea tu primer registro o explora los existentes.",
                     },
                 },
             ],
