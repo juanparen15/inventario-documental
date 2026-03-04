@@ -22,3 +22,20 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Archivos de sesiones de Claude Code
+/.claude/
+2026-*.txt
+2025-*.txt
+
+# Dumps de base de datos y archivos temporales del proyecto
+*.sql
+bdpaakgr*.sql
+
+# Hojas de cálculo y documentos de trabajo (no van en el repo)
+*.xlsx
+*.xls
+"Cuadro de Clasificación Documental-CCD.xlsx"
+
+# Archivos basura
+origin)
