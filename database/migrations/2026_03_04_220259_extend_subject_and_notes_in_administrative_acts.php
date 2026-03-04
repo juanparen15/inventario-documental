@@ -16,8 +16,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('administrative_acts', function (Blueprint $table) {
-            $table->text('subject')->change();              // objeto del acto — sin límite
-            $table->string('slug', 500)->unique()->change(); // slug generado del subject — puede ser largo
+            $table->text('subject')->change();         // objeto del acto — sin límite
+            $table->string('slug', 500)->change();    // slug generado del subject — el índice unique ya existe
         });
     }
 
@@ -25,7 +25,7 @@ return new class extends Migration
     {
         Schema::table('administrative_acts', function (Blueprint $table) {
             $table->string('subject', 255)->change();
-            $table->string('slug', 255)->unique()->change();
+            $table->string('slug', 255)->change();
         });
     }
 };
