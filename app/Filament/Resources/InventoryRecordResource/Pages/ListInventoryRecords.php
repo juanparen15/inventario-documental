@@ -20,7 +20,7 @@ class ListInventoryRecords extends ListRecords
 {
     protected static string $resource = InventoryRecordResource::class;
 
-    protected function getHeader(): ?\Illuminate\Contracts\View\View
+    public function getHeader(): ?\Illuminate\Contracts\View\View
     {
         $user = auth()->user();
 
