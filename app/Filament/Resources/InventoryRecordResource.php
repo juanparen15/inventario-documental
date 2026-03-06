@@ -381,8 +381,7 @@ class InventoryRecordResource extends Resource
                     ->label('Oficina Productora')
                     ->searchable()
                     ->sortable()
-                    ->toggleable()
-                    ->visible(fn() => auth()->user()?->hasRole('super_admin')),
+                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('inventory_purpose')
                     ->label('Objeto')
