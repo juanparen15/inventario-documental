@@ -20,6 +20,24 @@ class ListInventoryRecords extends ListRecords
 {
     protected static string $resource = InventoryRecordResource::class;
 
+    protected function getHeader(): ?\Illuminate\Contracts\View\View
+    {
+        $user = auth()->user();
+
+        if ($user?->hasRole('super_admin') || !$user?->organizational_unit_id) {
+            return null;
+        }
+
+        $unit  = $user->organizationalUnit;
+        $count = InventoryRecord::where('organizational_unit_id', $user->organizational_unit_id)->count();
+
+        return view('filament.components.unit-scope-banner', [
+            'unitName'   => $unit?->name   ?? '—',
+            'entityName' => $unit?->entity?->name ?? '—',
+            'count'      => $count,
+        ]);
+    }
+
     protected function getHeaderActions(): array
     {
         return [
