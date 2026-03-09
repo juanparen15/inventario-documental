@@ -298,6 +298,7 @@ class AdministrativeActResource extends Resource
                 Tables\Columns\TextColumn::make('filing_number')
                     ->label('Consecutivo')
                     ->searchable()
+                    ->copyable()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('documentarySeries.name')
@@ -315,6 +316,7 @@ class AdministrativeActResource extends Resource
                 Tables\Columns\TextColumn::make('subject')
                     ->label('Objeto')
                     ->searchable()
+                    ->copyable()
                     ->limit(50)
                     ->tooltip(fn($record) => $record->subject),
 
@@ -324,19 +326,19 @@ class AdministrativeActResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
-                Tables\Columns\TextColumn::make('attachments')
-                    ->label('Archivos PDF')
-                    ->sortable()
-                    ->formatStateUsing(function ($state) {
-                        if (empty($state)) {
-                            return '—';
-                        }
-                        $count = is_array($state) ? count($state) : 1;
-                        return $count . ' PDF' . ($count > 1 ? 's' : '');
-                    })
-                    ->icon(fn($state) => !empty($state) ? 'heroicon-o-document' : null)
-                    ->color(fn($state) => !empty($state) ? 'success' : 'gray')
-                    ->toggleable(),
+                // Tables\Columns\TextColumn::make('attachments')
+                //     ->label('Archivos PDF')
+                //     ->sortable()
+                //     ->formatStateUsing(function ($state) {
+                //         if (empty($state)) {
+                //             return '—';
+                //         }
+                //         $count = is_array($state) ? count($state) : 1;
+                //         return $count . ' PDF' . ($count > 1 ? 's' : '');
+                //     })
+                //     ->icon(fn($state) => !empty($state) ? 'heroicon-o-document' : null)
+                //     ->color(fn($state) => !empty($state) ? 'success' : 'gray')
+                //     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('confidential_attachments')
                     ->label('Conf.')
@@ -417,7 +419,7 @@ class AdministrativeActResource extends Resource
                     ->relationship('organizationalUnit', 'name')
                     ->searchable()
                     ->preload()
-                    ->visible(fn () => auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
+                    ->visible(fn() => auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
 
                 Tables\Filters\SelectFilter::make('documentary_series_id')
                     ->label('Serie Documental')
@@ -448,7 +450,8 @@ class AdministrativeActResource extends Resource
                     ->icon('heroicon-o-document-text')
                     ->color('success')
                     ->authorize(fn() => true)
-                    ->visible(fn(AdministrativeAct $record) =>
+                    ->visible(
+                        fn(AdministrativeAct $record) =>
                         !empty($record->attachments) || !empty($record->confidential_attachments)
                     )
                     ->modalHeading('Archivos PDF Adjuntos')
@@ -490,7 +493,7 @@ class AdministrativeActResource extends Resource
                     ->modalCancelActionLabel('Cerrar'),
 
                 Tables\Actions\EditAction::make()
-                    ->visible(fn(AdministrativeAct $record) => $record->created_at->diffInDays(now()) <= 30),
+                    ->visible(fn(AdministrativeAct $record) => $record->created_at->diffInDays(now()) <= 30 || $record->lacksPdf()),
 
                 Tables\Actions\Action::make('uploadLate')
                     ->label('Subir PDF')
@@ -552,7 +555,8 @@ class AdministrativeActResource extends Resource
                                     if (file_exists($path)) {
                                         $folios += static::countPagesFromPdf($path);
                                     }
-                                } catch (\Throwable) {}
+                                } catch (\Throwable) {
+                                }
                             }
                             $record->update([
                                 'attachments'        => $files,
