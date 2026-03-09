@@ -493,7 +493,10 @@ class AdministrativeActResource extends Resource
                     ->modalCancelActionLabel('Cerrar'),
 
                 Tables\Actions\EditAction::make()
-                    ->visible(fn(AdministrativeAct $record) => $record->created_at->diffInDays(now()) <= 30 || $record->lacksPdf()),
+                    ->visible(fn(AdministrativeAct $record) =>
+                        auth()->user()?->hasRole('super_admin') ||
+                        ($record->lacksPdf() && $record->created_at->diffInDays(now()) <= 30)
+                    ),
 
                 Tables\Actions\Action::make('uploadLate')
                     ->label('Subir PDF')
