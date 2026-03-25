@@ -519,7 +519,7 @@ class AdministrativeActResource extends Resource
                             ->directory('administrative-acts')
                             ->multiple()
                             ->acceptedFileTypes(['application/pdf'])
-                            ->maxSize(20480)
+                            ->maxSize(204800)
                             ->hidden(fn(Get $get) => $get('is_confidential') && !auth()->user()?->hasRole('supervisor'))
                             ->required(fn(Get $get) => !$get('is_confidential') || auth()->user()?->hasRole('supervisor')),
 
@@ -528,7 +528,7 @@ class AdministrativeActResource extends Resource
                             ->directory('administrative-acts-confidential')
                             ->multiple()
                             ->acceptedFileTypes(['application/pdf'])
-                            ->maxSize(20480)
+                            ->maxSize(204800)
                             ->hidden(fn(Get $get) => !$get('is_confidential') || auth()->user()?->hasRole('supervisor'))
                             ->required(fn(Get $get) => $get('is_confidential') && !auth()->user()?->hasRole('supervisor')),
 
