@@ -228,7 +228,6 @@ class AdministrativeActResource extends Resource
                                 }
 
                                 $totalPages = 0;
-                                $largeFiles = 0;
                                 foreach ($files as $file) {
                                     try {
                                         $path = $file instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile
@@ -236,24 +235,15 @@ class AdministrativeActResource extends Resource
                                             : storage_path('app/public/' . $file);
 
                                         if ($path && file_exists($path)) {
-                                            if (@filesize($path) > 10 * 1024 * 1024) {
-                                                $largeFiles++;
-                                            } else {
-                                                $totalPages += static::countPagesFromPdf($path);
-                                            }
+                                            $totalPages += static::countPagesFromPdf($path);
                                         }
                                     } catch (\Throwable $e) {
                                         // Never block the form
                                     }
                                 }
 
-                                if ($totalPages > 0 && $largeFiles === 0) {
+                                if ($totalPages > 0) {
                                     return "{$totalPages} folios";
-                                }
-
-                                if ($largeFiles > 0) {
-                                    $msg = $totalPages > 0 ? "{$totalPages} folios + " : '';
-                                    return "{$msg}{$largeFiles} archivo(s) grande(s) — folios no contabilizados automáticamente";
                                 }
 
                                 return count($files) . ' archivo(s) adjunto(s)';
@@ -659,38 +649,53 @@ class AdministrativeActResource extends Resource
 
     /**
      * Cuenta las paginas de un PDF de forma robusta.
-     * Intenta con smalot/pdfparser primero, luego con regex como fallback.
+     * Prioriza pdfinfo (sin carga en memoria), luego smalot para archivos pequeños.
      */
     public static function countPagesFromPdf(string $path): int
     {
-        // Omitir archivos grandes para evitar OOM en producción (>10 MB)
-        if (@filesize($path) > 10 * 1024 * 1024) {
-            return 0;
-        }
-
-        // Intento 1: smalot/pdfparser (mas preciso)
-        try {
-            $parser = new \Smalot\PdfParser\Parser();
-            $pdf = $parser->parseFile($path);
-            $count = count($pdf->getPages());
-            if ($count > 0) {
-                return $count;
+        // Intento 1: pdfinfo (poppler-utils) — eficiente para cualquier tamaño
+        if (function_exists('exec')) {
+            try {
+                $output   = [];
+                $exitCode = 0;
+                exec('pdfinfo ' . escapeshellarg($path) . ' 2>/dev/null', $output, $exitCode);
+                if ($exitCode === 0) {
+                    foreach ($output as $line) {
+                        if (preg_match('/^Pages:\s*(\d+)/i', $line, $matches)) {
+                            return (int) $matches[1];
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // pdfinfo no disponible
             }
-        } catch (\Throwable $e) {
-            // Fallback
         }
 
-        // Intento 2: contar marcadores /Type /Page en el contenido crudo del PDF
-        try {
-            $content = file_get_contents($path);
-            if ($content !== false) {
-                $count = preg_match_all('/\/Type\s*\/Page(?!s)/', $content);
+        // Intento 2: smalot/pdfparser (solo archivos ≤10 MB para evitar OOM)
+        if (@filesize($path) <= 10 * 1024 * 1024) {
+            try {
+                $parser = new \Smalot\PdfParser\Parser();
+                $pdf    = $parser->parseFile($path);
+                $count  = count($pdf->getPages());
                 if ($count > 0) {
                     return $count;
                 }
+            } catch (\Throwable $e) {
+                // Fallback
             }
-        } catch (\Throwable $e) {
-            // No se pudo leer
+
+            // Intento 3: regex en contenido crudo del PDF
+            try {
+                $content = file_get_contents($path);
+                if ($content !== false) {
+                    $count = preg_match_all('/\/Type\s*\/Page(?!s)/', $content);
+                    if ($count > 0) {
+                        return $count;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // No se pudo leer
+            }
         }
 
         return 0;
