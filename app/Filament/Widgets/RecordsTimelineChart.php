@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 
 class RecordsTimelineChart extends ChartWidget
 {
-    protected static ?string $heading = 'Linea de Tiempo: FUID y CCD';
+    protected static ?string $heading = 'Evolución Histórica de Documentos por Año';
 
     protected static ?int $sort = 5;
 
@@ -19,23 +19,22 @@ class RecordsTimelineChart extends ChartWidget
 
     protected function getData(): array
     {
-        $user = auth()->user();
+        $user         = auth()->user();
         $isSuperAdmin = $user?->hasRole('super_admin');
-        $unitId = $user?->organizational_unit_id;
+        $unitId       = $user?->organizational_unit_id;
 
-        $driver = DB::connection()->getDriverName();
+        $driver      = DB::connection()->getDriverName();
         $currentYear = (int) date('Y');
-        $minYear = 2010;
+        $minYear     = 2010;
 
         if ($driver === 'sqlite') {
             $yearExpressionStart = "strftime('%Y', start_date)";
-            $yearExpressionAct = "strftime('%Y', created_at)";
+            $yearExpressionAct   = "strftime('%Y', created_at)";
         } else {
             $yearExpressionStart = 'YEAR(start_date)';
-            $yearExpressionAct = 'YEAR(created_at)';
+            $yearExpressionAct   = 'YEAR(created_at)';
         }
 
-        // FUID data
         $fuidQuery = InventoryRecord::select(
             DB::raw("{$yearExpressionStart} as year"),
             DB::raw('COUNT(*) as count')
@@ -55,7 +54,6 @@ class RecordsTimelineChart extends ChartWidget
             ->get()
             ->keyBy('year');
 
-        // CCD data
         $ccdQuery = AdministrativeAct::select(
             DB::raw("{$yearExpressionAct} as year"),
             DB::raw('COUNT(*) as count')
@@ -74,33 +72,35 @@ class RecordsTimelineChart extends ChartWidget
             ->get()
             ->keyBy('year');
 
-        // Merge years from both datasets
-        $allYears = $fuidData->keys()->merge($ccdData->keys())->unique()->sort()->values();
-
+        $allYears  = $fuidData->keys()->merge($ccdData->keys())->unique()->sort()->values();
         $fuidCounts = $allYears->map(fn($year) => $fuidData->get($year)?->count ?? 0)->toArray();
-        $ccdCounts = $allYears->map(fn($year) => $ccdData->get($year)?->count ?? 0)->toArray();
+        $ccdCounts  = $allYears->map(fn($year) => $ccdData->get($year)?->count ?? 0)->toArray();
 
         return [
             'datasets' => [
                 [
-                    'label' => 'FUID - Registros',
-                    'data' => $fuidCounts,
-                    'borderColor' => 'rgba(59, 130, 246, 1)',
-                    'backgroundColor' => 'rgba(59, 130, 246, 0.2)',
-                    'fill' => true,
-                    'tension' => 0.3,
-                    'pointRadius' => 5,
-                    'pointHoverRadius' => 7,
+                    'label'               => 'Inventario (FUID)',
+                    'data'                => $fuidCounts,
+                    'borderColor'         => 'rgba(59, 130, 246, 1)',
+                    'backgroundColor'     => 'rgba(59, 130, 246, 0.15)',
+                    'fill'                => true,
+                    'tension'             => 0.4,
+                    'pointRadius'         => 5,
+                    'pointHoverRadius'    => 8,
+                    'pointBackgroundColor'=> 'rgba(59, 130, 246, 1)',
+                    'borderWidth'         => 2,
                 ],
                 [
-                    'label' => 'CCD - Actos',
-                    'data' => $ccdCounts,
-                    'borderColor' => 'rgba(16, 185, 129, 1)',
-                    'backgroundColor' => 'rgba(16, 185, 129, 0.2)',
-                    'fill' => true,
-                    'tension' => 0.3,
-                    'pointRadius' => 5,
-                    'pointHoverRadius' => 7,
+                    'label'               => 'SUR (CCD)',
+                    'data'                => $ccdCounts,
+                    'borderColor'         => 'rgba(16, 185, 129, 1)',
+                    'backgroundColor'     => 'rgba(16, 185, 129, 0.15)',
+                    'fill'                => true,
+                    'tension'             => 0.4,
+                    'pointRadius'         => 5,
+                    'pointHoverRadius'    => 8,
+                    'pointBackgroundColor'=> 'rgba(16, 185, 129, 1)',
+                    'borderWidth'         => 2,
                 ],
             ],
             'labels' => $allYears->toArray(),
@@ -114,26 +114,56 @@ class RecordsTimelineChart extends ChartWidget
 
     protected function getOptions(): array
     {
+        $bgFn     = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'rgba(15,23,42,0.97)':'rgba(255,255,255,0.97)'; }";
+        $titleFn  = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'#f1f5f9':'#0f172a'; }";
+        $bodyFn   = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'#94a3b8':'#475569'; }";
+        $borderFn = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'rgba(51,65,85,0.8)':'rgba(226,232,240,1)'; }";
+
         return [
             'plugins' => [
                 'legend' => [
                     'display' => true,
-                    'labels' => [
-                        'padding' => 15,
-                        'font' => [
-                            'size' => 12,
-                        ],
+                    'labels'  => [
+                        'padding'    => 15,
+                        'boxWidth'   => 14,
+                        'boxHeight'  => 14,
+                        'font'       => ['size' => 12],
+                        'usePointStyle' => true,
+                    ],
+                ],
+                'tooltip' => [
+                    'enabled'         => true,
+                    'mode'            => 'index',
+                    'intersect'       => false,
+                    'backgroundColor' => $bgFn,
+                    'titleColor'      => $titleFn,
+                    'bodyColor'       => $bodyFn,
+                    'borderColor'     => $borderFn,
+                    'borderWidth'     => 1,
+                    'padding'         => 12,
+                    'cornerRadius'    => 8,
+                    'displayColors'   => true,
+                    'boxWidth'        => 10,
+                    'boxHeight'       => 10,
+                    'callbacks'       => [
+                        'title' => "function(items){ return items[0]?.label ? 'Año '+items[0].label : ''; }",
+                        'label' => "function(ctx){ return '  '+ctx.dataset.label+': '+ctx.raw+' documento(s)'; }",
+                        'footer' => "function(items){ var total=items.reduce(function(s,i){return s+i.raw;},0); return total>0?'  Total año: '+total+' documento(s)':''; }",
                     ],
                 ],
             ],
             'scales' => [
                 'y' => [
                     'beginAtZero' => true,
-                    'ticks' => [
-                        'stepSize' => 1,
-                    ],
+                    'ticks'       => ['precision' => 0, 'stepSize' => 1],
+                    'grid'        => ['color' => 'rgba(156, 163, 175, 0.15)'],
+                ],
+                'x' => [
+                    'grid' => ['display' => false],
                 ],
             ],
+            'responsive'          => true,
+            'maintainAspectRatio' => false,
         ];
     }
 }
