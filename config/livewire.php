@@ -65,7 +65,7 @@ return [
 
     'temporary_file_upload' => [
         'disk' => 'local',     // Disco local explícito para consistencia en producción
-        'rules' => ['required', 'file', 'max:51200'], // 50MB - Filament FileUpload aplica sus propias reglas adicionales
+        'rules' => ['required', 'file', 'max:204800'], // 200MB — debe coincidir con upload_max_filesize en php.ini
         'directory' => 'livewire-tmp', // Directorio explícito para evitar ambigüedades
         'middleware' => null,  // Example: 'throttle:5,1'             | Default: 'throttle:60,1'
         'preview_mimes' => [   // Supported file types for temporary pre-signed file URLs...
