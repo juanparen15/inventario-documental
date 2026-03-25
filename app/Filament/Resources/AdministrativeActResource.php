@@ -228,6 +228,7 @@ class AdministrativeActResource extends Resource
                                 }
 
                                 $totalPages = 0;
+                                $largeFiles = 0;
                                 foreach ($files as $file) {
                                     try {
                                         $path = $file instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile
@@ -235,15 +236,24 @@ class AdministrativeActResource extends Resource
                                             : storage_path('app/public/' . $file);
 
                                         if ($path && file_exists($path)) {
-                                            $totalPages += static::countPagesFromPdf($path);
+                                            if (@filesize($path) > 10 * 1024 * 1024) {
+                                                $largeFiles++;
+                                            } else {
+                                                $totalPages += static::countPagesFromPdf($path);
+                                            }
                                         }
                                     } catch (\Throwable $e) {
                                         // Never block the form
                                     }
                                 }
 
-                                if ($totalPages > 0) {
+                                if ($totalPages > 0 && $largeFiles === 0) {
                                     return "{$totalPages} folios";
+                                }
+
+                                if ($largeFiles > 0) {
+                                    $msg = $totalPages > 0 ? "{$totalPages} folios + " : '';
+                                    return "{$msg}{$largeFiles} archivo(s) grande(s) — folios no contabilizados automáticamente";
                                 }
 
                                 return count($files) . ' archivo(s) adjunto(s)';
@@ -653,6 +663,11 @@ class AdministrativeActResource extends Resource
      */
     public static function countPagesFromPdf(string $path): int
     {
+        // Omitir archivos grandes para evitar OOM en producción (>10 MB)
+        if (@filesize($path) > 10 * 1024 * 1024) {
+            return 0;
+        }
+
         // Intento 1: smalot/pdfparser (mas preciso)
         try {
             $parser = new \Smalot\PdfParser\Parser();
