@@ -457,14 +457,15 @@ class AdministrativeActResource extends Resource
                     ->modalHeading('Archivos PDF Adjuntos')
                     ->modalWidth('5xl')
                     ->modalContent(function (AdministrativeAct $record) {
-                        $attachments      = $record->attachments ?? [];
-                        $isSuperAdmin     = auth()->user()?->hasRole('super_admin');
-                        $isSupervisor     = auth()->user()?->hasRole('supervisor');
-                        $confidentialAll  = $record->confidential_attachments ?? [];
+                        $attachments       = $record->attachments ?? [];
+                        $isSuperAdmin      = auth()->user()?->hasRole('super_admin');
+                        $isOwner           = auth()->id() == $record->created_by;
+                        $confidentialAll   = $record->confidential_attachments ?? [];
                         $confidentialCount = count($confidentialAll);
 
-                        // Supervisor no puede ver confidenciales
-                        $confidential = $isSupervisor ? [] : $confidentialAll;
+                        // Solo el creador del registro y el super_admin pueden ver archivos confidenciales
+                        $canSeeConfidential = $isSuperAdmin || $isOwner;
+                        $confidential = $canSeeConfidential ? $confidentialAll : [];
 
                         // Registrar actividad cuando super_admin consulta archivos confidenciales
                         if ($isSuperAdmin && $confidentialCount > 0) {
@@ -473,20 +474,20 @@ class AdministrativeActResource extends Resource
                                 ->causedBy(auth()->user())
                                 ->event('confidential_viewed')
                                 ->withProperties([
-                                    'ip'                    => request()->ip(),
+                                    'ip'                      => request()->ip(),
                                     'archivos_confidenciales' => $confidentialCount,
                                 ])
                                 ->log('Super admin consultó archivos confidenciales');
                         }
 
-                        if (empty($attachments) && empty($confidential) && (!$isSupervisor || $confidentialCount === 0)) {
+                        if (empty($attachments) && empty($confidential) && ($canSeeConfidential || $confidentialCount === 0)) {
                             return view('filament.components.no-attachments');
                         }
                         return view('filament.components.attachments-list', [
                             'attachments'       => $attachments,
                             'confidential'      => $confidential,
-                            'confidentialCount' => $isSupervisor ? $confidentialCount : 0,
-                            'isAdmin'           => $isSupervisor,
+                            'confidentialCount' => !$canSeeConfidential ? $confidentialCount : 0,
+                            'isAdmin'           => !$canSeeConfidential,
                         ]);
                     })
                     ->modalSubmitAction(false)
