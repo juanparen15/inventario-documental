@@ -253,7 +253,7 @@ class AdministrativeActResource extends Resource
                     ]),
 
                 Forms\Components\Section::make('Documentos Confidenciales')
-                    ->description('Solo tú, usuarios de tu unidad y el administrador pueden ver estos documentos. Los supervisores no tienen acceso.')
+                    ->description('Solo tú (quien subió el documento) y el administrador pueden ver y descargar estos archivos.')
                     ->icon('heroicon-o-lock-closed')
                     ->iconColor('warning')
                     ->collapsible()
@@ -269,8 +269,14 @@ class AdministrativeActResource extends Resource
                             ->reorderable()
                             ->live(),
                     ])
-                    ->hidden(fn() => auth()->user()?->hasRole('supervisor'))
-                    ->dehydrated(fn() => !auth()->user()?->hasRole('supervisor')),
+                    ->hidden(fn(?AdministrativeAct $record) =>
+                        !auth()->user()?->hasRole('super_admin') &&
+                        auth()->id() != $record?->created_by
+                    )
+                    ->dehydrated(fn(?AdministrativeAct $record) =>
+                        auth()->user()?->hasRole('super_admin') ||
+                        auth()->id() == $record?->created_by
+                    ),
 
                 Forms\Components\Section::make('Registro de retraso')
                     ->icon('heroicon-o-clock')
