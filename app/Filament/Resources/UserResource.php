@@ -47,7 +47,6 @@ class UserResource extends Resource
                             ->email()
                             ->required()
                             ->unique(ignoreRecord: true)
-                            ->copyable()    
                             ->maxLength(255),
 
                         Forms\Components\TextInput::make('phone')
@@ -108,6 +107,7 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('email')
                     ->label('Correo Electrónico')
                     ->searchable()
+                    ->copyable()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('organizationalUnit.name')
