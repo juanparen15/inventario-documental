@@ -1,0 +1,72 @@
+---
+title: Inventario Documental
+description: Documentación completa del Sistema de Inventario Documental para gestión de Actos Administrativos e Inventario Documental en entidades gubernamentales colombianas.
+template: splash
+hero:
+  tagline: Sistema integral para la gestión de Actos Administrativos (CCD/SUR) e Inventario Documental (FUID) con numeración automática, control de cumplimiento PDF y reportes mensuales.
+  image:
+    file: ../../assets/houston.webp
+  actions:
+    - text: Comenzar
+      link: /docs/inicio/introduccion/
+      icon: right-arrow
+    - text: Guía de Instalación
+      link: /docs/instalacion/requisitos/
+      icon: rocket
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Características Principales
+
+<CardGrid stagger>
+	<Card title="Actos Administrativos (SUR/CCD)" icon="document">
+		Radicación automática con formato YYYY.ENTIDAD.SERIE.SUBSERIE.###.SUR, control de adjuntos PDF con plazo de 30 días y sección confidencial.
+	</Card>
+	<Card title="Inventario Documental (FUID)" icon="list-format">
+		Registro de documentos con clasificación TRD, ubicación física (caja, carpeta, tomo), fechas extremas y código de referencia automático.
+	</Card>
+	<Card title="Reportes Mensuales" icon="approve-check">
+		Informes de cumplimiento PDF exportables en Excel y PDF con KPIs por unidad, entidad y serie documental.
+	</Card>
+	<Card title="Control de Acceso por Roles" icon="warning">
+		Roles super_admin, supervisor y usuario con restricciones por unidad organizacional y archivos confidenciales.
+	</Card>
+	<Card title="Dashboard Interactivo" icon="star">
+		11 widgets con estadísticas en tiempo real, gráficas de cumplimiento, evolución histórica y últimos registros.
+	</Card>
+	<Card title="Auditoría Completa" icon="seti:notebook">
+		Registro detallado de todas las acciones con Spatie ActivityLog: quién creó, editó o accedió a cada documento.
+	</Card>
+</CardGrid>
+
+## Módulos del Sistema
+
+<CardGrid>
+	<Card title="Usuario" icon="open-book">
+		Crea y gestiona actos administrativos e inventario de su unidad organizacional.
+		[Ver guía](/docs/usuario/primeros-pasos/)
+	</Card>
+	<Card title="Supervisor" icon="approve-check">
+		Supervisa todas las unidades, accede a reportes mensuales e importa datos masivamente.
+		[Ver guía](/docs/roles/supervisor/)
+	</Card>
+	<Card title="Super Admin" icon="setting">
+		Administración total: usuarios, entidades, unidades, series documentales y configuración.
+		[Ver guía](/docs/roles/super-admin/)
+	</Card>
+</CardGrid>
+
+## Stack Tecnológico
+
+- **Backend**: Laravel 12 · PHP 8.2+
+- **Panel Admin**: FilamentPHP 3.2
+- **Base de Datos**: MySQL / MariaDB
+- **Permisos**: Spatie Permission + Filament Shield
+- **Exportación**: Maatwebsite Excel · DomPDF
+- **Auditoría**: Spatie ActivityLog
+
+## Soporte
+
+Si necesitas ayuda, consulta la sección de [Solución de Problemas](/docs/referencia/troubleshooting/) o revisa los [Comandos de referencia](/docs/referencia/comandos/).
