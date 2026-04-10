@@ -35,7 +35,7 @@ class AdminPanelProvider extends PanelProvider
 
         FilamentView::registerRenderHook(
             PanelsRenderHook::BODY_END,
-            fn(): string => '<script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.js.iife.js"></script><script src="' . asset('js/tour-inventario.js') . '"></script>',
+            fn(): string => '<script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.js.iife.js"></script><script src="' . asset('js/tour-inventario.js') . '"></script><script src="' . asset('js/chart-config.js') . '"></script>',
         );
 
         // WhatsApp Widget — CSS
