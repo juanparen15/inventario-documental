@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use Awcodes\LightSwitch\LightSwitchPlugin;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
+use JeffersonGoncalves\Filament\WhatsappWidget\WhatsappWidgetPlugin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -35,6 +36,18 @@ class AdminPanelProvider extends PanelProvider
         FilamentView::registerRenderHook(
             PanelsRenderHook::BODY_END,
             fn(): string => '<script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.js.iife.js"></script><script src="' . asset('js/tour-inventario.js') . '"></script>',
+        );
+
+        // WhatsApp Widget — CSS
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::HEAD_END,
+            fn(): string => '<link rel="stylesheet" href="' . asset('vendor/whatsapp-widget/assets/app-CgZ3I7dV.css') . '">',
+        );
+
+        // WhatsApp Widget — HTML + JS
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::BODY_END,
+            fn(): \Illuminate\Contracts\View\View => view('whatsapp-widget::whatsapp-widget-body'),
         );
     }
 
@@ -106,6 +119,7 @@ class AdminPanelProvider extends PanelProvider
             ->plugins([
                 FilamentShieldPlugin::make(),
                 LightSwitchPlugin::make(),
+                WhatsappWidgetPlugin::make(),
             ]);
     }
 }
