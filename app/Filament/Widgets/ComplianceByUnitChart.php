@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\AdministrativeAct;
+use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 
 /**
@@ -91,54 +92,60 @@ class ComplianceByUnitChart extends ChartWidget
         return 'bar';
     }
 
-    protected function getOptions(): array
+    protected function getOptions(): RawJs
     {
-        // Colores para tooltip según modo claro/oscuro (evaluados en cada hover)
-        $bgFn     = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'rgba(15,23,42,0.97)':'rgba(255,255,255,0.97)'; }";
-        $titleFn  = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'#f1f5f9':'#0f172a'; }";
-        $bodyFn   = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'#94a3b8':'#475569'; }";
-        $borderFn = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'rgba(51,65,85,0.8)':'rgba(226,232,240,1)'; }";
-
-        return [
-            'indexAxis' => 'y',
-            'plugins'   => [
-                'legend'  => ['display' => false],
-                'tooltip' => [
-                    'enabled'         => true,
-                    'backgroundColor' => $bgFn,
-                    'titleColor'      => $titleFn,
-                    'bodyColor'       => $bodyFn,
-                    'borderColor'     => $borderFn,
-                    'borderWidth'     => 1,
-                    'padding'         => 12,
-                    'cornerRadius'    => 8,
-                    'displayColors'   => true,
-                    'boxWidth'        => 10,
-                    'boxHeight'       => 10,
-                    'callbacks'       => [
-                        // Título: nombre completo de la unidad (sin truncar)
-                        'title' => "function(items){ if(!items.length) return ''; var d=items[0].chart.data; return (d.fullLabels&&d.fullLabels[items[0].dataIndex]) ? d.fullLabels[items[0].dataIndex] : items[0].label; }",
-                        // Cuerpo: porcentaje de cumplimiento + conteo con/sin PDF
-                        'label' => "function(ctx){ var pct=ctx.raw.toFixed(1); var ds=ctx.dataset; var i=ctx.dataIndex; var total=ds.totalCounts?ds.totalCounts[i]:'?'; var pdf=ds.withPdfCounts?ds.withPdfCounts[i]:'?'; var sin=total!=='?'?(total-pdf):'?'; return ['  Cumplimiento: '+pct+'%','  Con PDF: '+pdf+' de '+total+' actos','  Sin PDF: '+sin]; }",
-                    ],
-                ],
-            ],
-            'scales' => [
-                'x' => [
-                    'beginAtZero' => true,
-                    'max'         => 100,
-                    'ticks'       => [
-                        'callback' => "function(v){ return v + '%' }",
-                    ],
-                    'grid' => ['color' => 'rgba(156, 163, 175, 0.15)'],
-                ],
-                'y' => [
-                    'grid'  => ['display' => false],
-                    'ticks' => ['font' => ['size' => 11]],
-                ],
-            ],
-            'responsive'          => true,
-            'maintainAspectRatio' => false,
-        ];
+        return RawJs::make(<<<JS
+            {
+                indexAxis: 'y',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        enabled: true,
+                        backgroundColor: (ctx) => document.documentElement.classList.contains('dark') ? 'rgba(15,23,42,0.97)' : 'rgba(255,255,255,0.97)',
+                        titleColor: (ctx) => document.documentElement.classList.contains('dark') ? '#f1f5f9' : '#0f172a',
+                        bodyColor: (ctx) => document.documentElement.classList.contains('dark') ? '#94a3b8' : '#475569',
+                        borderColor: (ctx) => document.documentElement.classList.contains('dark') ? 'rgba(51,65,85,0.8)' : 'rgba(226,232,240,1)',
+                        borderWidth: 1,
+                        padding: 12,
+                        cornerRadius: 8,
+                        displayColors: true,
+                        boxWidth: 10,
+                        boxHeight: 10,
+                        callbacks: {
+                            title: (items) => {
+                                if (!items.length) return '';
+                                const d = items[0].chart.data;
+                                return (d.fullLabels && d.fullLabels[items[0].dataIndex])
+                                    ? d.fullLabels[items[0].dataIndex]
+                                    : items[0].label;
+                            },
+                            label: (ctx) => {
+                                const pct = ctx.raw.toFixed(1);
+                                const ds = ctx.dataset;
+                                const i = ctx.dataIndex;
+                                const total = ds.totalCounts ? ds.totalCounts[i] : '?';
+                                const pdf = ds.withPdfCounts ? ds.withPdfCounts[i] : '?';
+                                const sin = total !== '?' ? (total - pdf) : '?';
+                                return ['  Cumplimiento: ' + pct + '%', '  Con PDF: ' + pdf + ' de ' + total + ' actos', '  Sin PDF: ' + sin];
+                            },
+                        },
+                    },
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: { callback: (v) => v + '%' },
+                        grid: { color: 'rgba(156, 163, 175, 0.15)' },
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11 } },
+                    },
+                },
+                responsive: true,
+                maintainAspectRatio: false,
+            }
+        JS);
     }
 }

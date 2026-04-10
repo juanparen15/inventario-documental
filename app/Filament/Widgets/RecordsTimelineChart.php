@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Models\AdministrativeAct;
 use App\Models\InventoryRecord;
+use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\DB;
 
@@ -112,58 +113,50 @@ class RecordsTimelineChart extends ChartWidget
         return 'line';
     }
 
-    protected function getOptions(): array
+    protected function getOptions(): RawJs
     {
-        $bgFn     = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'rgba(15,23,42,0.97)':'rgba(255,255,255,0.97)'; }";
-        $titleFn  = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'#f1f5f9':'#0f172a'; }";
-        $bodyFn   = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'#94a3b8':'#475569'; }";
-        $borderFn = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'rgba(51,65,85,0.8)':'rgba(226,232,240,1)'; }";
-
-        return [
-            'plugins' => [
-                'legend' => [
-                    'display' => true,
-                    'labels'  => [
-                        'padding'    => 15,
-                        'boxWidth'   => 14,
-                        'boxHeight'  => 14,
-                        'font'       => ['size' => 12],
-                        'usePointStyle' => true,
-                    ],
-                ],
-                'tooltip' => [
-                    'enabled'         => true,
-                    'mode'            => 'index',
-                    'intersect'       => false,
-                    'backgroundColor' => $bgFn,
-                    'titleColor'      => $titleFn,
-                    'bodyColor'       => $bodyFn,
-                    'borderColor'     => $borderFn,
-                    'borderWidth'     => 1,
-                    'padding'         => 12,
-                    'cornerRadius'    => 8,
-                    'displayColors'   => true,
-                    'boxWidth'        => 10,
-                    'boxHeight'       => 10,
-                    'callbacks'       => [
-                        'title' => "function(items){ return items[0]?.label ? 'Año '+items[0].label : ''; }",
-                        'label' => "function(ctx){ return '  '+ctx.dataset.label+': '+ctx.raw+' documento(s)'; }",
-                        'footer' => "function(items){ var total=items.reduce(function(s,i){return s+i.raw;},0); return total>0?'  Total año: '+total+' documento(s)':''; }",
-                    ],
-                ],
-            ],
-            'scales' => [
-                'y' => [
-                    'beginAtZero' => true,
-                    'ticks'       => ['precision' => 0, 'stepSize' => 1],
-                    'grid'        => ['color' => 'rgba(156, 163, 175, 0.15)'],
-                ],
-                'x' => [
-                    'grid' => ['display' => false],
-                ],
-            ],
-            'responsive'          => true,
-            'maintainAspectRatio' => false,
-        ];
+        return RawJs::make(<<<JS
+            {
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: { padding: 15, boxWidth: 14, boxHeight: 14, font: { size: 12 }, usePointStyle: true },
+                    },
+                    tooltip: {
+                        enabled: true,
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: (ctx) => document.documentElement.classList.contains('dark') ? 'rgba(15,23,42,0.97)' : 'rgba(255,255,255,0.97)',
+                        titleColor: (ctx) => document.documentElement.classList.contains('dark') ? '#f1f5f9' : '#0f172a',
+                        bodyColor: (ctx) => document.documentElement.classList.contains('dark') ? '#94a3b8' : '#475569',
+                        borderColor: (ctx) => document.documentElement.classList.contains('dark') ? 'rgba(51,65,85,0.8)' : 'rgba(226,232,240,1)',
+                        borderWidth: 1,
+                        padding: 12,
+                        cornerRadius: 8,
+                        displayColors: true,
+                        boxWidth: 10,
+                        boxHeight: 10,
+                        callbacks: {
+                            title: (items) => items[0]?.label ? 'Año ' + items[0].label : '',
+                            label: (ctx) => '  ' + ctx.dataset.label + ': ' + ctx.raw + ' documento(s)',
+                            footer: (items) => {
+                                const total = items.reduce((s, i) => s + i.raw, 0);
+                                return total > 0 ? '  Total año: ' + total + ' documento(s)' : '';
+                            },
+                        },
+                    },
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0, stepSize: 1 },
+                        grid: { color: 'rgba(156, 163, 175, 0.15)' },
+                    },
+                    x: { grid: { display: false } },
+                },
+                responsive: true,
+                maintainAspectRatio: false,
+            }
+        JS);
     }
 }

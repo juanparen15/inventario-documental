@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\DocumentarySeries;
+use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 
 class RecordsBySeriesChart extends ChartWidget
@@ -69,45 +70,42 @@ class RecordsBySeriesChart extends ChartWidget
         return 'doughnut';
     }
 
-    protected function getOptions(): array
+    protected function getOptions(): RawJs
     {
-        $bgFn     = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'rgba(15,23,42,0.97)':'rgba(255,255,255,0.97)'; }";
-        $titleFn  = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'#f1f5f9':'#0f172a'; }";
-        $bodyFn   = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'#94a3b8':'#475569'; }";
-        $borderFn = "function(ctx){ var d=document.documentElement.classList.contains('dark'); return d?'rgba(51,65,85,0.8)':'rgba(226,232,240,1)'; }";
-
-        return [
-            'plugins' => [
-                'legend' => [
-                    'position' => 'right',
-                    'display'  => true,
-                    'labels'   => [
-                        'padding'   => 12,
-                        'boxWidth'  => 14,
-                        'boxHeight' => 14,
-                        'font'      => ['size' => 11],
-                    ],
-                ],
-                'tooltip' => [
-                    'enabled'         => true,
-                    'backgroundColor' => $bgFn,
-                    'titleColor'      => $titleFn,
-                    'bodyColor'       => $bodyFn,
-                    'borderColor'     => $borderFn,
-                    'borderWidth'     => 1,
-                    'padding'         => 12,
-                    'cornerRadius'    => 8,
-                    'displayColors'   => true,
-                    'boxWidth'        => 10,
-                    'boxHeight'       => 10,
-                    'callbacks'       => [
-                        'title' => "function(items){ return items[0]?.label || ''; }",
-                        'label' => "function(ctx){ var val=ctx.parsed; var total=ctx.dataset.data.reduce(function(a,b){return a+b;},0); var pct=total>0?(val/total*100).toFixed(1):'0'; return '  '+val+' registros — '+pct+'% del total'; }",
-                    ],
-                ],
-            ],
-            'maintainAspectRatio' => false,
-            'responsive'          => true,
-        ];
+        return RawJs::make(<<<JS
+            {
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        display: true,
+                        labels: { padding: 12, boxWidth: 14, boxHeight: 14, font: { size: 11 } },
+                    },
+                    tooltip: {
+                        enabled: true,
+                        backgroundColor: (ctx) => document.documentElement.classList.contains('dark') ? 'rgba(15,23,42,0.97)' : 'rgba(255,255,255,0.97)',
+                        titleColor: (ctx) => document.documentElement.classList.contains('dark') ? '#f1f5f9' : '#0f172a',
+                        bodyColor: (ctx) => document.documentElement.classList.contains('dark') ? '#94a3b8' : '#475569',
+                        borderColor: (ctx) => document.documentElement.classList.contains('dark') ? 'rgba(51,65,85,0.8)' : 'rgba(226,232,240,1)',
+                        borderWidth: 1,
+                        padding: 12,
+                        cornerRadius: 8,
+                        displayColors: true,
+                        boxWidth: 10,
+                        boxHeight: 10,
+                        callbacks: {
+                            title: (items) => items[0]?.label || '',
+                            label: (ctx) => {
+                                const val = ctx.parsed;
+                                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                const pct = total > 0 ? (val / total * 100).toFixed(1) : '0';
+                                return '  ' + val + ' registros — ' + pct + '% del total';
+                            },
+                        },
+                    },
+                },
+                maintainAspectRatio: false,
+                responsive: true,
+            }
+        JS);
     }
 }
