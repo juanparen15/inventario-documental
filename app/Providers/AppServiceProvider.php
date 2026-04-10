@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -24,5 +25,10 @@ class AppServiceProvider extends ServiceProvider
         if (config('app.env') === 'production') {
             URL::forceScheme('https');
         }
+
+        Gate::policy(
+            \JeffersonGoncalves\WhatsappWidget\Models\WhatsappAgent::class,
+            \App\Policies\WhatsappAgentPolicy::class,
+        );
     }
 }

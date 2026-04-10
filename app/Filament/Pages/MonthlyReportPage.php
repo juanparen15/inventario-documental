@@ -38,6 +38,9 @@ class MonthlyReportPage extends Page
 
     public function getTitle(): string
     {
+        if (!isset($this->selectedYear, $this->selectedMonth)) {
+            return 'Informe Mensual';
+        }
         return 'Informe Mensual — ' . mb_strtoupper($this->getMonthLabel());
     }
 
