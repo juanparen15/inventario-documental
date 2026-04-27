@@ -361,14 +361,14 @@ class AdministrativeActResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->toggleable()
-                    ->visible(fn() => auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
+                    ->visible(fn() => auth()->user()?->hasRole('super_admin')),
 
                 Tables\Columns\TextColumn::make('organizationalUnit.name')
                     ->label('Unidad')
                     ->searchable()
                     ->sortable()
                     ->toggleable()
-                    ->visible(fn() => auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
+                    ->visible(fn() => auth()->user()?->hasRole('super_admin')),
 
                 Tables\Columns\TextColumn::make('pdf_days_remaining')
                     ->label('Días para PDF')
@@ -425,7 +425,7 @@ class AdministrativeActResource extends Resource
                     ->relationship('organizationalUnit', 'name')
                     ->searchable()
                     ->preload()
-                    ->visible(fn() => auth()->user()?->hasAnyRole(['super_admin', 'supervisor'])),
+                    ->visible(fn() => auth()->user()?->hasRole('super_admin')),
 
                 Tables\Filters\SelectFilter::make('documentary_series_id')
                     ->label('Serie Documental')
@@ -512,7 +512,7 @@ class AdministrativeActResource extends Resource
                     ->modalHeading('Subir documento con retraso')
                     ->modalDescription('El plazo de 30 días ha vencido. Adjunta el documento PDF e indica la razón del retraso.')
                     ->modalWidth('lg')
-                    ->visible(fn(AdministrativeAct $record) => $record->lacksPdf() && $record->pdfDaysRemaining() < 0)
+                    ->visible(fn(AdministrativeAct $record) => $record->lacksPdf() && $record->pdfDaysRemaining() <= 0)
                     ->form([
                         Forms\Components\Toggle::make('is_confidential')
                             ->label('Documento confidencial')
@@ -626,7 +626,7 @@ class AdministrativeActResource extends Resource
 
         $user = auth()->user();
 
-        if ($user && ! $user->hasAnyRole(['super_admin', 'supervisor'])) {
+        if ($user && ! $user->hasRole('super_admin')) {
             if ($user->organizational_unit_id) {
                 $query->where('organizational_unit_id', $user->organizational_unit_id);
             } else {
@@ -645,7 +645,7 @@ class AdministrativeActResource extends Resource
     public static function getNavigationBadge(): ?string
     {
         $user = auth()->user();
-        if ($user && !$user->hasAnyRole(['super_admin', 'supervisor'])) {
+        if ($user && !$user->hasRole('super_admin')) {
             if ($user->organizational_unit_id) {
                 return static::getModel()::where('organizational_unit_id', $user->organizational_unit_id)->count();
             }
