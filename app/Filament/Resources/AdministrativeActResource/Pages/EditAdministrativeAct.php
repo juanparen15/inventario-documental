@@ -14,7 +14,18 @@ class EditAdministrativeAct extends EditRecord
     {
         parent::mount($record);
 
-        if ($this->record->created_at->diffInDays(now()) > 30) {
+        $user = auth()->user();
+        $isSuperAdmin = $user?->hasRole('super_admin');
+        $isCreator = $user?->id === $this->record->created_by;
+
+        if (! $isSuperAdmin && ! $isCreator) {
+            $this->redirect(
+                $this->getResource()::getUrl('view', ['record' => $this->record])
+            );
+            return;
+        }
+
+        if (! $isSuperAdmin && $this->record->created_at->diffInDays(now()) > 30) {
             $this->redirect(
                 $this->getResource()::getUrl('view', ['record' => $this->record])
             );

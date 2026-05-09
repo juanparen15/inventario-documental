@@ -36,10 +36,15 @@ class AdministrativeActPolicy
 
     /**
      * Determine whether the user can update the model.
+     * Solo el creador del registro o el super_admin pueden editar.
      */
     public function update(User $user, AdministrativeAct $administrativeAct): bool
     {
-        return $user->can('update_administrative::act');
+        if ($user->hasRole('super_admin')) {
+            return true;
+        }
+
+        return $user->can('update_administrative::act') && $user->id === $administrativeAct->created_by;
     }
 
     /**

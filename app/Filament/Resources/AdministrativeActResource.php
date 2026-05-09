@@ -433,6 +433,12 @@ class AdministrativeActResource extends Resource
                     ->searchable()
                     ->preload(),
 
+                Tables\Filters\SelectFilter::make('created_by')
+                    ->label('Creado por')
+                    ->relationship('creator', 'name')
+                    ->searchable()
+                    ->preload(),
+
                 Tables\Filters\Filter::make('created_at')
                     ->form([
                         Forms\Components\DatePicker::make('from')
@@ -502,7 +508,11 @@ class AdministrativeActResource extends Resource
                 Tables\Actions\EditAction::make()
                     ->visible(fn(AdministrativeAct $record) =>
                         auth()->user()?->hasRole('super_admin') ||
-                        ($record->lacksPdf() && $record->created_at->diffInDays(now()) <= 30)
+                        (
+                            auth()->id() == $record->created_by &&
+                            $record->lacksPdf() &&
+                            $record->created_at->diffInDays(now()) <= 30
+                        )
                     ),
 
                 Tables\Actions\Action::make('uploadLate')
@@ -512,7 +522,11 @@ class AdministrativeActResource extends Resource
                     ->modalHeading('Subir documento con retraso')
                     ->modalDescription('El plazo de 30 días ha vencido. Adjunta el documento PDF e indica la razón del retraso.')
                     ->modalWidth('lg')
-                    ->visible(fn(AdministrativeAct $record) => $record->lacksPdf() && $record->pdfDaysRemaining() <= 0)
+                    ->visible(fn(AdministrativeAct $record) =>
+                        $record->lacksPdf() &&
+                        $record->pdfDaysRemaining() <= 0 &&
+                        (auth()->user()?->hasRole('super_admin') || auth()->id() == $record->created_by)
+                    )
                     ->form([
                         Forms\Components\Toggle::make('is_confidential')
                             ->label('Documento confidencial')
