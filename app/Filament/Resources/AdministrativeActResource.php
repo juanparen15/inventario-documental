@@ -216,7 +216,6 @@ class AdministrativeActResource extends Resource
                             ->downloadable()
                             ->openable()
                             ->reorderable()
-                            ->live()
                             ->columnSpanFull(),
 
                         Forms\Components\Placeholder::make('folios_display')
@@ -266,8 +265,7 @@ class AdministrativeActResource extends Resource
                             ->maxSize(204800)
                             ->downloadable()
                             ->openable()
-                            ->reorderable()
-                            ->live(),
+                            ->reorderable(),
                     ])
                     ->hidden(fn(?AdministrativeAct $record) =>
                         !auth()->user()?->hasRole('super_admin') &&
