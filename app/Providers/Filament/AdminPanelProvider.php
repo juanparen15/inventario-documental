@@ -38,6 +38,28 @@ class AdminPanelProvider extends PanelProvider
             fn(): string => '<script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.js.iife.js"></script><script src="' . asset('js/tour-inventario.js') . '"></script><script src="' . asset('js/chart-config.js') . '"></script>',
         );
 
+        // Chatwoot — widget de chat
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::BODY_END,
+            fn(): string => <<<'HTML'
+            <script>
+              (function(d,t) {
+                var BASE_URL="http://192.168.93.19:8005";
+                var g=d.createElement(t),s=d.getElementsByTagName(t)[0];
+                g.src=BASE_URL+"/packs/js/sdk.js";
+                g.async = true;
+                s.parentNode.insertBefore(g,s);
+                g.onload=function(){
+                  window.chatwootSDK.run({
+                    websiteToken: '47cdrW9PfPVat8DrYCDNMoQk',
+                    baseUrl: BASE_URL
+                  })
+                }
+              })(document,"script");
+            </script>
+            HTML,
+        );
+
         // WhatsApp Widget — CSS
         FilamentView::registerRenderHook(
             PanelsRenderHook::HEAD_END,
