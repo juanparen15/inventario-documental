@@ -44,7 +44,7 @@ class AdminPanelProvider extends PanelProvider
             fn(): string => <<<'HTML'
             <script>
               (function(d,t) {
-                var BASE_URL="http://192.168.93.19:8005";
+                var BASE_URL="https://contactenos.ticsistemas.com.co";
                 var g=d.createElement(t),s=d.getElementsByTagName(t)[0];
                 g.src=BASE_URL+"/packs/js/sdk.js";
                 g.async = true;
