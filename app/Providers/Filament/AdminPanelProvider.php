@@ -63,7 +63,8 @@ class AdminPanelProvider extends PanelProvider
         // WhatsApp Widget — CSS
         FilamentView::registerRenderHook(
             PanelsRenderHook::HEAD_END,
-            fn(): string => '<link rel="stylesheet" href="' . asset('vendor/whatsapp-widget/assets/app-CgZ3I7dV.css') . '">',
+            fn(): string => '<link rel="stylesheet" href="' . asset('vendor/whatsapp-widget/assets/app-CgZ3I7dV.css') . '">'
+                . '<style>.bottom-right{right:auto!important;left:30px!important}</style>',
         );
 
         // WhatsApp Widget — HTML + JS
