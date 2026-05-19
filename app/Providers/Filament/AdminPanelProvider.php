@@ -43,6 +43,7 @@ class AdminPanelProvider extends PanelProvider
             PanelsRenderHook::BODY_END,
             fn(): string => <<<'HTML'
             <script>
+              window.chatwootSettings = {"position":"right","type":"standard","launcherTitle":""};
               (function(d,t) {
                 var BASE_URL="https://contactenos.ticsistemas.com.co";
                 var g=d.createElement(t),s=d.getElementsByTagName(t)[0];
