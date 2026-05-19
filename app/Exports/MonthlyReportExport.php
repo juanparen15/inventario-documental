@@ -51,16 +51,16 @@ class MonthlyReportResumenSheet implements FromArray, WithTitle, ShouldAutoSize,
         $k = $this->kpis;
 
         return [
-            ['INFORME MENSUAL DE ACTOS ADMINISTRATIVOS'],
+            ['INFORME MENSUAL DE DOCUMENTOS'],
             ['Período:', mb_strtoupper($this->monthLabel)],
             ['Generado:', now()->format('d/m/Y H:i')],
             [],
             ['INDICADORES CLAVE'],
             ['Indicador', 'Valor', 'Detalle'],
-            ['Total de actos registrados', $k['total'], 'En el período seleccionado'],
-            ['Actos con PDF adjunto', $k['conPdf'], number_format($k['compliance'], 1) . '% de cumplimiento'],
-            ['Actos sin PDF adjunto', $k['sinPdf'], $k['sinPdf'] === 0 ? 'Sin pendientes' : 'Requieren atención'],
-            ['Actos vencidos (> 30 días sin PDF)', $k['vencidos'], $k['vencidos'] === 0 ? 'Sin vencidos' : 'Urgente'],
+            ['Total de documentos registrados', $k['total'], 'En el período seleccionado'],
+            ['Documentos con PDF adjunto', $k['conPdf'], number_format($k['compliance'], 1) . '% de cumplimiento'],
+            ['Documentos sin PDF adjunto', $k['sinPdf'], $k['sinPdf'] === 0 ? 'Sin pendientes' : 'Requieren atención'],
+            ['Documentos vencidos (> 30 días sin PDF)', $k['vencidos'], $k['vencidos'] === 0 ? 'Sin vencidos' : 'Urgente'],
             ['Por vencer (próximos 7 días)', $k['porVencer'], $k['porVencer'] === 0 ? 'Sin alertas' : 'Atención'],
             ['Tasa de cumplimiento PDF', number_format($k['compliance'], 1) . '%', $k['compliance'] >= 90 ? 'Óptimo' : ($k['compliance'] >= 70 ? 'Regular' : 'Crítico')],
         ];
@@ -158,9 +158,9 @@ class MonthlyReportUnidadesSheet implements FromArray, WithTitle, ShouldAutoSize
     public function array(): array
     {
         $rows = [
-            ['DISTRIBUCIÓN DE ACTOS — ' . mb_strtoupper($this->monthLabel)],
+            ['DISTRIBUCIÓN DE DOCUMENTOS — ' . mb_strtoupper($this->monthLabel)],
             [],
-            ['Entidad', 'Unidad Organizacional', 'Serie / Subserie', 'Cantidad de Actos'],
+            ['Entidad', 'Unidad Organizacional', 'Serie / Subserie', 'Cantidad de Documentos'],
         ];
 
         $acts = AdministrativeAct::with(['organizationalUnit.entity', 'documentarySeries', 'documentarySubseries'])
@@ -227,7 +227,7 @@ class MonthlyReportSinPdfSheet implements FromArray, WithTitle, ShouldAutoSize, 
     public function array(): array
     {
         $rows = [
-            ['ACTOS SIN PDF ADJUNTO (HISTÓRICO)'],
+            ['DOCUMENTOS SIN PDF ADJUNTO (HISTÓRICO)'],
             ['Generado:', now()->format('d/m/Y H:i')],
             [],
             ['Consecutivo', 'Entidad', 'Unidad', 'Objeto / Asunto', 'Fecha Registro', 'Días para PDF', 'Estado'],
@@ -268,7 +268,7 @@ class MonthlyReportSinPdfSheet implements FromArray, WithTitle, ShouldAutoSize, 
         }
 
         if (count($rows) === 4) {
-            $rows[] = ['', '', '', '✓ Todos los actos tienen PDF adjunto.', '', '', ''];
+            $rows[] = ['', '', '', '✓ Todos los documentos tienen PDF adjunto.', '', '', ''];
         }
 
         return $rows;

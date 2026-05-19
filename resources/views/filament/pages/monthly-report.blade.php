@@ -35,7 +35,7 @@
      DISTRIBUCIÓN POR CLASIFICACIÓN
 ══════════════════════════════════════════════════════════════════ --}}
 <x-filament::section
-    heading="Distribución de actos por clasificación"
+    heading="Distribución de documentos por clasificación"
     description="{{ mb_strtoupper($this->getMonthLabel()) }}"
     icon="heroicon-o-squares-2x2"
     icon-color="primary"
@@ -48,7 +48,7 @@
                 icon="heroicon-o-inbox"
                 class="w-10 h-10"
             />
-            <p class="text-sm">No hay actos registrados en este período.</p>
+            <p class="text-sm">No hay documentos registrados en este período.</p>
         </div>
     @else
         <div class="space-y-4">
@@ -67,7 +67,7 @@
                         </div>
                         @php $entityTotal = array_sum(array_map('array_sum', $units)); @endphp
                         <x-filament::badge color="gray" size="sm" class="bg-white/20 text-white border-0">
-                            {{ number_format($entityTotal) }} actos
+                            {{ number_format($entityTotal) }} documentos
                         </x-filament::badge>
                     </div>
 
@@ -122,7 +122,7 @@
 >
     <x-slot name="heading">
         <div class="flex items-center gap-3">
-            <span>Actos sin PDF adjunto</span>
+            <span>Documentos sin PDF adjunto</span>
             @if($pending->isNotEmpty())
                 <x-filament::badge color="danger">
                     {{ $pending->count() }} pendiente{{ $pending->count() !== 1 ? 's' : '' }}
@@ -132,7 +132,7 @@
     </x-slot>
 
     <x-slot name="description">
-        Histórico acumulado de actos sin documento PDF adjunto
+        Histórico acumulado de documentos sin PDF adjunto
     </x-slot>
 
     @if($pending->isEmpty())
@@ -141,7 +141,7 @@
                 icon="heroicon-o-check-circle"
                 class="w-10 h-10"
             />
-            <p class="text-sm font-semibold">Todos los actos tienen PDF adjunto.</p>
+            <p class="text-sm font-semibold">Todos los documentos tienen PDF adjunto.</p>
         </div>
     @else
         @php

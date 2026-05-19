@@ -65,7 +65,7 @@ class MonthlyStatsOverview extends BaseWidget
 
         return [
             // ── Actos del período ────────────────────────────────────────
-            Stat::make('Actos del período', number_format($totalPeriod))
+            Stat::make('Documentos del período', number_format($totalPeriod))
                 ->description(match (true) {
                     $trend > 0  => '+' . $trend . ' vs ' . $prev->locale('es')->isoFormat('MMMM'),
                     $trend < 0  => $trend . ' vs ' . $prev->locale('es')->isoFormat('MMMM'),
@@ -86,7 +86,7 @@ class MonthlyStatsOverview extends BaseWidget
             // ── Cumplimiento PDF ─────────────────────────────────────────
             Stat::make('Cumplimiento PDF', $compliance . '%')
                 ->description($sinPdf === 0
-                    ? 'Todos los actos tienen PDF'
+                    ? 'Todos los documentos tienen PDF'
                     : number_format($sinPdf) . ' pendiente(s) en total'
                 )
                 ->descriptionIcon($sinPdf === 0
@@ -114,7 +114,7 @@ class MonthlyStatsOverview extends BaseWidget
             // ── Vencidos ─────────────────────────────────────────────────
             Stat::make('Vencidos (> 30 días)', number_format($vencidos))
                 ->description($vencidos === 0
-                    ? ($porVencer > 0 ? $porVencer . ' por vencer esta semana' : 'Sin actos vencidos')
+                    ? ($porVencer > 0 ? $porVencer . ' por vencer esta semana' : 'Sin documentos vencidos')
                     : 'Superaron el plazo sin PDF'
                 )
                 ->descriptionIcon($vencidos === 0

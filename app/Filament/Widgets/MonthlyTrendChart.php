@@ -42,7 +42,7 @@ class MonthlyTrendChart extends ChartWidget
         return [
             'datasets' => [
                 [
-                    'label'               => 'Actos registrados',
+                    'label'               => 'Documentos registrados',
                     'data'                => $points->pluck('count')->all(),
                     'backgroundColor'     => 'rgba(59, 130, 246, 0.80)',
                     'borderColor'         => 'rgba(59, 130, 246, 1)',
@@ -87,7 +87,7 @@ class MonthlyTrendChart extends ChartWidget
                             },
                             label: (ctx) => {
                                 const n = ctx.raw;
-                                return '  ' + n + (n === 1 ? ' acto registrado' : ' actos registrados');
+                                return '  ' + n + (n === 1 ? ' documento registrado' : ' documentos registrados');
                             },
                         },
                     },
