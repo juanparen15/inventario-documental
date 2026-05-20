@@ -15,5 +15,6 @@ use Illuminate\Support\Facades\Route;
 |                o query ?token={CHATWOOT_API_TOKEN}
 */
 
-Route::get('/chatwoot/search', [ChatwootSearchController::class, 'search']);
-Route::get('/chatwoot/stats',  [ChatwootSearchController::class, 'stats']);
+Route::get('/chatwoot/context', [ChatwootSearchController::class, 'context']); // principal
+Route::get('/chatwoot/search',  [ChatwootSearchController::class, 'search']);
+Route::get('/chatwoot/stats',   [ChatwootSearchController::class, 'stats']);

@@ -11,6 +11,53 @@ use Illuminate\Http\Request;
 class ChatwootSearchController extends Controller
 {
     /**
+     * Endpoint combinado: búsqueda + estadísticas en una sola llamada.
+     * Es el endpoint principal que usa n8n para dar contexto a Gemini.
+     *
+     * GET /api/chatwoot/context?q=mensaje_del_usuario&token=...
+     */
+    public function context(Request $request): JsonResponse
+    {
+        if (! $this->authorized($request)) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $rawQuery = trim($request->query('q', ''));
+        $keywords = $this->extractKeywords($rawQuery);
+
+        $searchData = [];
+        $statsData  = [];
+
+        if (! empty($keywords)) {
+            // Búsqueda de registros relevantes
+            $surResults       = $this->searchSUR($keywords, 5);
+            $inventoryResults = $this->searchInventory($keywords, 5);
+            $searchData = [
+                'keywords'  => $keywords,
+                'sur'       => $surResults,
+                'inventory' => $inventoryResults,
+            ];
+
+            // Estadísticas por entidad (filtrando por keywords)
+            $statsData = $this->buildStats($keywords);
+        }
+
+        // Totales globales siempre presentes
+        $globalTotals = [
+            'sur_total'        => AdministrativeAct::whereNull('deleted_at')->count(),
+            'inventario_total' => InventoryRecord::whereNull('deleted_at')->count(),
+        ];
+
+        return response()->json([
+            'pregunta'      => $rawQuery,
+            'keywords'      => $keywords,
+            'totales_globales' => $globalTotals,
+            'busqueda'      => $searchData,
+            'estadisticas'  => $statsData,
+        ]);
+    }
+
+    /**
      * Endpoint de búsqueda para el bot de Chatwoot.
      * Extrae palabras clave del mensaje completo del usuario y busca
      * en SUR (Actos Administrativos) e Inventario Documental (FUID).
@@ -134,6 +181,48 @@ class ChatwootSearchController extends Controller
     // ──────────────────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────────────────
+
+    private function buildStats(array $keywords): array
+    {
+        $surByEntity = AdministrativeAct::with('organizationalUnit.entity')
+            ->whereNull('deleted_at')
+            ->whereHas('organizationalUnit.entity', function ($e) use ($keywords) {
+                foreach ($keywords as $kw) {
+                    $e->orWhere('name', 'like', "%{$kw}%");
+                }
+            })
+            ->get()
+            ->groupBy(fn($a) => $a->organizationalUnit?->entity?->name ?? 'Sin entidad')
+            ->map(fn($group, $name) => [
+                'entidad' => $name,
+                'total'   => $group->count(),
+                'con_pdf' => $group->filter(fn($a) => ! $a->lacksPdf())->count(),
+                'sin_pdf' => $group->filter(fn($a) => $a->lacksPdf())->count(),
+            ])
+            ->sortByDesc('total')
+            ->values();
+
+        $invByEntity = InventoryRecord::with('organizationalUnit.entity')
+            ->whereNull('deleted_at')
+            ->whereHas('organizationalUnit.entity', function ($e) use ($keywords) {
+                foreach ($keywords as $kw) {
+                    $e->orWhere('name', 'like', "%{$kw}%");
+                }
+            })
+            ->get()
+            ->groupBy(fn($r) => $r->organizationalUnit?->entity?->name ?? 'Sin entidad')
+            ->map(fn($group, $name) => [
+                'entidad' => $name,
+                'total'   => $group->count(),
+            ])
+            ->sortByDesc('total')
+            ->values();
+
+        return [
+            'sur_por_entidad'        => $surByEntity,
+            'inventario_por_entidad' => $invByEntity,
+        ];
+    }
 
     private function authorized(Request $request): bool
     {
