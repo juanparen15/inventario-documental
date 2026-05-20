@@ -16,3 +16,4 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/chatwoot/search', [ChatwootSearchController::class, 'search']);
+Route::get('/chatwoot/stats',  [ChatwootSearchController::class, 'stats']);

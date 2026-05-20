@@ -11,53 +11,179 @@ use Illuminate\Http\Request;
 class ChatwootSearchController extends Controller
 {
     /**
-     * Endpoint para el bot de Chatwoot.
-     * Busca en tiempo real en el Sistema Unificado de Registro (SUR)
-     * y en el Inventario Documental (FUID).
+     * Endpoint de búsqueda para el bot de Chatwoot.
+     * Extrae palabras clave del mensaje completo del usuario y busca
+     * en SUR (Actos Administrativos) e Inventario Documental (FUID).
      *
      * GET /api/chatwoot/search?q=texto&limit=5
      */
     public function search(Request $request): JsonResponse
     {
-        // Validar token de seguridad
-        $token = $request->header('X-Chatwoot-Token') ?? $request->query('token');
-        if ($token !== config('app.chatwoot_api_token')) {
+        if (! $this->authorized($request)) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
-        $query = trim($request->query('q', ''));
-        $limit = min((int) $request->query('limit', 5), 10);
+        $rawQuery = trim($request->query('q', ''));
+        $limit    = min((int) $request->query('limit', 5), 10);
 
-        if (strlen($query) < 2) {
+        // Extraer palabras útiles (≥4 chars, sin stopwords)
+        $keywords = $this->extractKeywords($rawQuery);
+
+        if (empty($keywords)) {
             return response()->json([
-                'query'   => $query,
-                'results' => [],
-                'summary' => 'Consulta muy corta para buscar.',
+                'query'    => $rawQuery,
+                'keywords' => [],
+                'results'  => [],
+                'summary'  => 'No se encontraron términos de búsqueda relevantes.',
             ]);
         }
 
-        $surResults       = $this->searchSUR($query, $limit);
-        $inventoryResults = $this->searchInventory($query, $limit);
-
-        $total = count($surResults) + count($inventoryResults);
+        $surResults       = $this->searchSUR($keywords, $limit);
+        $inventoryResults = $this->searchInventory($keywords, $limit);
+        $total            = count($surResults) + count($inventoryResults);
 
         $summary = $total > 0
-            ? "Se encontraron {$total} registro(s) relacionados con \"{$query}\"."
-            : "No se encontraron registros relacionados con \"{$query}\".";
+            ? "Se encontraron {$total} registro(s) para los términos: " . implode(', ', $keywords) . '.'
+            : 'No se encontraron registros para los términos: ' . implode(', ', $keywords) . '.';
 
         return response()->json([
-            'query'     => $query,
+            'query'     => $rawQuery,
+            'keywords'  => $keywords,
             'summary'   => $summary,
             'sur'       => $surResults,
             'inventory' => $inventoryResults,
         ]);
     }
 
+    /**
+     * Endpoint de estadísticas/conteos para el bot de Chatwoot.
+     * Devuelve totales agrupados por entidad y serie en SUR e Inventario.
+     *
+     * GET /api/chatwoot/stats?entity=secretaria+general
+     */
+    public function stats(Request $request): JsonResponse
+    {
+        if (! $this->authorized($request)) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $filterRaw = trim($request->query('entity', ''));
+        $keywords  = $filterRaw ? $this->extractKeywords($filterRaw) : [];
+
+        // ── SUR: conteos por entidad ──────────────────────────────────
+        $surQuery = AdministrativeAct::with('organizationalUnit.entity')
+            ->selectRaw('COUNT(*) as total, organizational_unit_id')
+            ->whereNull('deleted_at')
+            ->groupBy('organizational_unit_id');
+
+        $surByEntity = AdministrativeAct::with('organizationalUnit.entity')
+            ->whereNull('deleted_at')
+            ->when($keywords, function ($q) use ($keywords) {
+                $q->whereHas('organizationalUnit.entity', function ($e) use ($keywords) {
+                    foreach ($keywords as $kw) {
+                        $e->orWhere('name', 'like', "%{$kw}%");
+                    }
+                });
+            })
+            ->get()
+            ->groupBy(fn($a) => $a->organizationalUnit?->entity?->name ?? 'Sin entidad')
+            ->map(fn($group, $name) => [
+                'entidad' => $name,
+                'total'   => $group->count(),
+                'con_pdf' => $group->filter(fn($a) => ! $a->lacksPdf())->count(),
+                'sin_pdf' => $group->filter(fn($a) => $a->lacksPdf())->count(),
+            ])
+            ->sortByDesc('total')
+            ->values();
+
+        // ── Inventario: conteos por entidad ───────────────────────────
+        $invByEntity = InventoryRecord::with('organizationalUnit.entity')
+            ->whereNull('deleted_at')
+            ->when($keywords, function ($q) use ($keywords) {
+                $q->whereHas('organizationalUnit.entity', function ($e) use ($keywords) {
+                    foreach ($keywords as $kw) {
+                        $e->orWhere('name', 'like', "%{$kw}%");
+                    }
+                });
+            })
+            ->get()
+            ->groupBy(fn($r) => $r->organizationalUnit?->entity?->name ?? 'Sin entidad')
+            ->map(fn($group, $name) => [
+                'entidad' => $name,
+                'total'   => $group->count(),
+            ])
+            ->sortByDesc('total')
+            ->values();
+
+        // ── Totales globales ──────────────────────────────────────────
+        $surTotal = AdministrativeAct::whereNull('deleted_at')->count();
+        $invTotal = InventoryRecord::whereNull('deleted_at')->count();
+
+        return response()->json([
+            'filter'    => $filterRaw ?: 'todos',
+            'keywords'  => $keywords,
+            'totales'   => [
+                'sur_total'       => $surTotal,
+                'inventario_total' => $invTotal,
+            ],
+            'sur_por_entidad'       => $surByEntity,
+            'inventario_por_entidad' => $invByEntity,
+        ]);
+    }
+
     // ──────────────────────────────────────────────────────────────
-    // Sistema Unificado de Registro (Actos Administrativos)
+    // Helpers
     // ──────────────────────────────────────────────────────────────
 
-    private function searchSUR(string $query, int $limit): array
+    private function authorized(Request $request): bool
+    {
+        $token = $request->header('X-Chatwoot-Token') ?? $request->query('token');
+        return $token === config('app.chatwoot_api_token');
+    }
+
+    /**
+     * Extrae palabras clave útiles de un texto largo.
+     * Elimina stopwords en español e inglés y palabras cortas (<4 chars).
+     */
+    private function extractKeywords(string $text): array
+    {
+        $stopwords = [
+            'para', 'como', 'desde', 'hasta', 'cuando', 'donde', 'sobre',
+            'entre', 'durante', 'mediante', 'según', 'cuántos', 'cuantos',
+            'cuántas', 'cuantas', 'tiene', 'tienen', 'hay', 'haber', 'saber',
+            'quiero', 'necesito', 'puedes', 'puede', 'dame', 'dime', 'muestra',
+            'mostrar', 'buscar', 'busco', 'lista', 'listar', 'total', 'todos',
+            'todas', 'unos', 'unas', 'este', 'esta', 'estos', 'estas', 'ese',
+            'esa', 'esos', 'esas', 'cual', 'cuál', 'que', 'qué', 'una', 'uno',
+            'los', 'las', 'del', 'con', 'por', 'son', 'fue', 'ser', 'sus',
+            'registro', 'registros', 'unificado', 'sistema', 'inventario',
+            'documental', 'documentos', 'documento', 'alcaldia', 'alcaldía',
+            'información', 'informacion', 'consulta', 'quieres', 'decir',
+            'favor', 'gracias', 'hola', 'buenos', 'días', 'dias', 'tardes',
+        ];
+
+        // Normalizar: minúsculas, quitar tildes, extraer palabras
+        $normalized = mb_strtolower($text);
+        $normalized = str_replace(
+            ['á','é','í','ó','ú','ü','ñ'],
+            ['a','e','i','o','u','u','n'],
+            $normalized
+        );
+        preg_match_all('/\b[a-záéíóúüñ]{4,}\b/u', $normalized, $matches);
+        $words = $matches[0] ?? [];
+
+        $keywords = array_values(array_unique(
+            array_filter($words, fn($w) => ! in_array($w, $stopwords))
+        ));
+
+        return array_slice($keywords, 0, 5); // máx 5 keywords
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Búsqueda SUR
+    // ──────────────────────────────────────────────────────────────
+
+    private function searchSUR(array $keywords, int $limit): array
     {
         $acts = AdministrativeAct::with([
             'organizationalUnit.entity',
@@ -65,74 +191,73 @@ class ChatwootSearchController extends Controller
             'documentarySubseries',
             'actClassification',
         ])
-            ->where(function ($q) use ($query) {
-                $q->where('filing_number', 'like', "%{$query}%")
-                  ->orWhere('subject', 'like', "%{$query}%")
-                  ->orWhereHas('documentarySeries', fn($s) => $s->where('name', 'like', "%{$query}%"))
-                  ->orWhereHas('documentarySubseries', fn($s) => $s->where('name', 'like', "%{$query}%"))
-                  ->orWhereHas('organizationalUnit', fn($u) => $u->where('name', 'like', "%{$query}%"))
-                  ->orWhereHas('organizationalUnit.entity', fn($e) => $e->where('name', 'like', "%{$query}%"));
+            ->where(function ($q) use ($keywords) {
+                foreach ($keywords as $kw) {
+                    $q->orWhere('filing_number', 'like', "%{$kw}%")
+                      ->orWhere('subject', 'like', "%{$kw}%")
+                      ->orWhereHas('documentarySeries', fn($s) => $s->where('name', 'like', "%{$kw}%"))
+                      ->orWhereHas('documentarySubseries', fn($s) => $s->where('name', 'like', "%{$kw}%"))
+                      ->orWhereHas('organizationalUnit', fn($u) => $u->where('name', 'like', "%{$kw}%"))
+                      ->orWhereHas('organizationalUnit.entity', fn($e) => $e->where('name', 'like', "%{$kw}%"));
+                }
             })
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get();
 
-        return $acts->map(function (AdministrativeAct $act) {
-            return [
-                'consecutivo'  => $act->filing_number,
-                'asunto'       => $act->subject,
-                'vigencia'     => $act->vigencia,
-                'serie'        => $act->documentarySeries?->name,
-                'subserie'     => $act->documentarySubseries?->name,
-                'entidad'      => $act->organizationalUnit?->entity?->name,
-                'dependencia'  => $act->organizationalUnit?->name,
-                'clasificacion'=> $act->actClassification?->name,
-                'tiene_pdf'    => ! $act->lacksPdf(),
-                'fecha_creacion' => $act->created_at?->format('d/m/Y'),
-            ];
-        })->toArray();
+        return $acts->map(fn(AdministrativeAct $act) => [
+            'consecutivo'   => $act->filing_number,
+            'asunto'        => $act->subject,
+            'vigencia'      => $act->vigencia,
+            'serie'         => $act->documentarySeries?->name,
+            'subserie'      => $act->documentarySubseries?->name,
+            'entidad'       => $act->organizationalUnit?->entity?->name,
+            'dependencia'   => $act->organizationalUnit?->name,
+            'clasificacion' => $act->actClassification?->name,
+            'tiene_pdf'     => ! $act->lacksPdf(),
+            'fecha_creacion' => $act->created_at?->format('d/m/Y'),
+        ])->toArray();
     }
 
     // ──────────────────────────────────────────────────────────────
-    // Inventario Documental (FUID)
+    // Búsqueda Inventario
     // ──────────────────────────────────────────────────────────────
 
-    private function searchInventory(string $query, int $limit): array
+    private function searchInventory(array $keywords, int $limit): array
     {
         $records = InventoryRecord::with([
             'organizationalUnit.entity',
             'documentarySeries',
             'documentarySubseries',
             'storageMedium',
-            'priorityLevel',
         ])
-            ->where(function ($q) use ($query) {
-                $q->where('title', 'like', "%{$query}%")
-                  ->orWhere('description', 'like', "%{$query}%")
-                  ->orWhere('reference_code', 'like', "%{$query}%")
-                  ->orWhereHas('documentarySeries', fn($s) => $s->where('name', 'like', "%{$query}%"))
-                  ->orWhereHas('documentarySubseries', fn($s) => $s->where('name', 'like', "%{$query}%"))
-                  ->orWhereHas('organizationalUnit', fn($u) => $u->where('name', 'like', "%{$query}%"))
-                  ->orWhereHas('organizationalUnit.entity', fn($e) => $e->where('name', 'like', "%{$query}%"));
+            ->where(function ($q) use ($keywords) {
+                foreach ($keywords as $kw) {
+                    $q->orWhere('title', 'like', "%{$kw}%")
+                      ->orWhere('description', 'like', "%{$kw}%")
+                      ->orWhere('reference_code', 'like', "%{$kw}%")
+                      ->orWhereHas('documentarySeries', fn($s) => $s->where('name', 'like', "%{$kw}%"))
+                      ->orWhereHas('documentarySubseries', fn($s) => $s->where('name', 'like', "%{$kw}%"))
+                      ->orWhereHas('organizationalUnit', fn($u) => $u->where('name', 'like', "%{$kw}%"))
+                      ->orWhereHas('organizationalUnit.entity', fn($e) => $e->where('name', 'like', "%{$kw}%"));
+                }
             })
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get();
 
-        return $records->map(function (InventoryRecord $record) {
-            return [
-                'codigo_referencia' => $record->reference_code,
-                'titulo'            => $record->title,
-                'descripcion'       => $record->description,
-                'serie'             => $record->documentarySeries?->name,
-                'subserie'          => $record->documentarySubseries?->name,
-                'entidad'           => $record->organizationalUnit?->entity?->name,
-                'dependencia'       => $record->organizationalUnit?->name,
-                'fechas'            => $record->date_range,
-                'ubicacion'         => $record->location,
-                'folios'            => $record->folios,
-                'soporte'           => $record->storageMedium?->name,
-            ];
-        })->toArray();
+        return $records->map(fn(InventoryRecord $record) => [
+            'codigo_referencia' => $record->reference_code,
+            'titulo'            => $record->title,
+            'descripcion'       => $record->description,
+            'serie'             => $record->documentarySeries?->name,
+            'subserie'          => $record->documentarySubseries?->name,
+            'entidad'           => $record->organizationalUnit?->entity?->name,
+            'dependencia'       => $record->organizationalUnit?->name,
+            'fechas'            => $record->date_range,
+            'ubicacion'         => $record->location,
+            'folios'            => $record->folios,
+            'soporte'           => $record->storageMedium?->name,
+        ])->toArray();
     }
 }
