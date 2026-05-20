@@ -123,4 +123,14 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Chatwoot Bot API Token
+    |--------------------------------------------------------------------------
+    | Token de seguridad para el endpoint de búsqueda usado por el bot de
+    | Chatwoot a través de n8n. Configurable via .env (CHATWOOT_API_TOKEN).
+    */
+
+    'chatwoot_api_token' => env('CHATWOOT_API_TOKEN', ''),
+
 ];
