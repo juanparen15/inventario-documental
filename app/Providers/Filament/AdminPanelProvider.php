@@ -64,24 +64,33 @@ class AdminPanelProvider extends PanelProvider
                         websiteToken: '47cdrW9PfPVat8DrYCDNMoQk',
                         baseUrl: BASE_URL
                       });
+                      var CW_EMAIL = '{$email}';
+                      var CW_NAME  = '{$name}';
+
+                      function cwIdentify() {
+                        localStorage.setItem('cw_user_email', CW_EMAIL);
+                        window.\$chatwoot.setUser(CW_EMAIL, { name: CW_NAME, email: CW_EMAIL });
+                      }
+
                       window.addEventListener('chatwoot:ready', function() {
-                        var currentEmail = '{$email}';
                         var prevEmail = localStorage.getItem('cw_user_email');
 
-                        // Si cambió el usuario: limpiar sesión y esperar
-                        // el próximo chatwoot:ready para identificar correctamente
-                        if (prevEmail && prevEmail !== currentEmail) {
+                        if (prevEmail && prevEmail !== CW_EMAIL) {
+                          // Cambió el usuario: limpiar y hacer reset
                           localStorage.removeItem('cw_user_email');
                           window.\$chatwoot.reset();
-                          return; // setUser se llama en el siguiente chatwoot:ready
+                          // chatwoot:ready debería disparar de nuevo tras el reset;
+                          // timeout como respaldo por si el SDK no lo hace
+                          setTimeout(function() {
+                            if (!localStorage.getItem('cw_user_email')) {
+                              cwIdentify();
+                            }
+                          }, 2000);
+                          return;
                         }
 
-                        // Primera vez o después del reset: identificar usuario
-                        localStorage.setItem('cw_user_email', currentEmail);
-                        window.\$chatwoot.setUser(currentEmail, {
-                          name: '{$name}',
-                          email: currentEmail
-                        });
+                        // Primera vez o después del reset (via chatwoot:ready)
+                        cwIdentify();
                       });
                     }
                   })(document,"script");
