@@ -83,6 +83,7 @@ class ChatwootSearchController extends Controller
             'pregunta'         => $rawQuery,
             'keywords'         => $keywords,
             'access_level'     => $accessLevel,
+            '_debug_email'     => $email,   // temporal — quitar después
             'scope'            => $accessLevel === 'restricted'
                 ? ['entidad' => $entityName, 'dependencia' => $unitName]
                 : ['entidad' => 'Todas', 'dependencia' => 'Todas'],
