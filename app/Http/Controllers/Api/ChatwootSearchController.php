@@ -43,7 +43,7 @@ class ChatwootSearchController extends Controller
                 ->first();
 
             if ($user) {
-                $isPrivileged = $user->hasAnyRole(['super_admin', 'supervisor', 'panel_user']);
+                $isPrivileged = $user->hasAnyRole(['super_admin', 'supervisor']);
 
                 if (! $isPrivileged) {
                     $accessLevel = 'restricted';

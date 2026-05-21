@@ -65,6 +65,12 @@ class AdminPanelProvider extends PanelProvider
                         baseUrl: BASE_URL
                       });
                       window.addEventListener('chatwoot:ready', function() {
+                        // Detectar cambio de usuario y limpiar sesión anterior
+                        var prevEmail = localStorage.getItem('cw_user_email');
+                        if (prevEmail && prevEmail !== '{$email}') {
+                          window.\$chatwoot.reset();
+                        }
+                        localStorage.setItem('cw_user_email', '{$email}');
                         window.\$chatwoot.setUser('{$email}', {
                           name: '{$name}',
                           email: '{$email}'
