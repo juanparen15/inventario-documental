@@ -63,15 +63,7 @@ class AdminPanelProvider extends PanelProvider
                       window.chatwootSDK.run({
                         websiteToken: '47cdrW9PfPVat8DrYCDNMoQk',
                         baseUrl: BASE_URL
-                      });
-                      var CW_EMAIL = '{$email}';
-                      var CW_NAME  = '{$name}';
-
-                      window.addEventListener('chatwoot:ready', function() {
-                        // Atributo para filtrado por rol — no usa setUser() para evitar
-                        // errores 401 cuando el contacto no tiene sesión todavía
-                        window.\$chatwoot.setCustomAttributes({ filament_email: CW_EMAIL });
-                      });
+                      })
                     }
                   })(document,"script");
                 </script>
