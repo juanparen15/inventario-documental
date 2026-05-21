@@ -68,10 +68,8 @@ class AdminPanelProvider extends PanelProvider
                       var CW_NAME  = '{$name}';
 
                       window.addEventListener('chatwoot:ready', function() {
-                        // Identificar al usuario de Filament en el contacto de Chatwoot
-                        window.\$chatwoot.setUser(CW_EMAIL, { name: CW_NAME, email: CW_EMAIL });
-                        // Atributo confiable para filtrado por rol: siempre refleja quién
-                        // está logueado en Filament, independientemente del contacto del SDK
+                        // Atributo para filtrado por rol — no usa setUser() para evitar
+                        // errores 401 cuando el contacto no tiene sesión todavía
                         window.\$chatwoot.setCustomAttributes({ filament_email: CW_EMAIL });
                       });
                     }
