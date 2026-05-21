@@ -52,7 +52,7 @@ class AdminPanelProvider extends PanelProvider
 
                 return <<<HTML
                 <script>
-                  window.chatwootSettings = {"position":"right","type":"expanded_bubble","launcherTitle":""};
+                  window.chatwootSettings = {"position":"right","type":"expanded_bubble","launcherTitle":"Chatbot"};
                   (function(d,t) {
                     var BASE_URL="https://contactenos.ticsistemas.com.co";
                     var g=d.createElement(t),s=d.getElementsByTagName(t)[0];
