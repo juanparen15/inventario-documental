@@ -63,7 +63,13 @@ class AdminPanelProvider extends PanelProvider
                       window.chatwootSDK.run({
                         websiteToken: '47cdrW9PfPVat8DrYCDNMoQk',
                         baseUrl: BASE_URL
-                      })
+                      });
+                      window.addEventListener('chatwoot:ready', function() {
+                        window.\$chatwoot.setUser('{$email}', {
+                          name: '{$name}',
+                          email: '{$email}'
+                        });
+                      });
                     }
                   })(document,"script");
                 </script>
