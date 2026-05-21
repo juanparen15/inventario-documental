@@ -65,15 +65,22 @@ class AdminPanelProvider extends PanelProvider
                         baseUrl: BASE_URL
                       });
                       window.addEventListener('chatwoot:ready', function() {
-                        // Detectar cambio de usuario y limpiar sesión anterior
+                        var currentEmail = '{$email}';
                         var prevEmail = localStorage.getItem('cw_user_email');
-                        if (prevEmail && prevEmail !== '{$email}') {
+
+                        // Si cambió el usuario: limpiar sesión y esperar
+                        // el próximo chatwoot:ready para identificar correctamente
+                        if (prevEmail && prevEmail !== currentEmail) {
+                          localStorage.removeItem('cw_user_email');
                           window.\$chatwoot.reset();
+                          return; // setUser se llama en el siguiente chatwoot:ready
                         }
-                        localStorage.setItem('cw_user_email', '{$email}');
-                        window.\$chatwoot.setUser('{$email}', {
+
+                        // Primera vez o después del reset: identificar usuario
+                        localStorage.setItem('cw_user_email', currentEmail);
+                        window.\$chatwoot.setUser(currentEmail, {
                           name: '{$name}',
-                          email: '{$email}'
+                          email: currentEmail
                         });
                       });
                     }
