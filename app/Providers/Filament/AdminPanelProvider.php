@@ -69,6 +69,11 @@ class AdminPanelProvider extends PanelProvider
                           name: '{$name}',
                           email: '{$email}'
                         });
+                        // Escribe el email en los custom_attributes de la conversación
+                        // para que n8n lo pueda leer desde current_conversation.custom_attributes.filament_email
+                        window.\$chatwoot.setCustomAttributes({
+                          filament_email: '{$email}'
+                        });
                       });
                     }
                   })(document,"script");
