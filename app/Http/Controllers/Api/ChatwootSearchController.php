@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AdministrativeAct;
 use App\Models\InventoryRecord;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -12,9 +13,12 @@ class ChatwootSearchController extends Controller
 {
     /**
      * Endpoint combinado: búsqueda + estadísticas en una sola llamada.
-     * Es el endpoint principal que usa n8n para dar contexto a Gemini.
+     * Filtra la información según el rol del usuario que consulta.
      *
-     * GET /api/chatwoot/context?q=mensaje_del_usuario&token=...
+     * GET /api/chatwoot/context?q=mensaje&email=user@ejemplo.com&token=...
+     *
+     * Roles con acceso total : super_admin, supervisor
+     * Roles con acceso parcial: cualquier otro rol → solo su entidad
      */
     public function context(Request $request): JsonResponse
     {
@@ -23,37 +27,68 @@ class ChatwootSearchController extends Controller
         }
 
         $rawQuery = trim($request->query('q', ''));
+        $email    = trim($request->query('email', ''));
         $keywords = $this->extractKeywords($rawQuery);
 
+        // ── Resolver permisos del usuario ────────────────────────────
+        $accessLevel  = 'full';   // super_admin / supervisor
+        $entityId     = null;
+        $entityName   = null;
+        $unitId       = null;
+        $unitName     = null;
+
+        if ($email) {
+            $user = User::with('organizationalUnit.entity')
+                ->where('email', $email)
+                ->first();
+
+            if ($user) {
+                $isPrivileged = $user->hasAnyRole(['super_admin', 'supervisor', 'panel_user']);
+
+                if (! $isPrivileged) {
+                    $accessLevel = 'restricted';
+                    $unit        = $user->organizationalUnit;
+                    $unitId      = $unit?->id;
+                    $unitName    = $unit?->name;
+                    $entityId    = $unit?->entity?->id;
+                    $entityName  = $unit?->entity?->name;
+                }
+            }
+        }
+
+        $filter = $accessLevel === 'restricted'
+            ? ['unit_id' => $unitId, 'entity_id' => $entityId]
+            : null;
+
+        // ── Búsqueda y estadísticas ───────────────────────────────────
         $searchData = [];
         $statsData  = [];
 
         if (! empty($keywords)) {
-            // Búsqueda de registros relevantes
-            $surResults       = $this->searchSUR($keywords, 5);
-            $inventoryResults = $this->searchInventory($keywords, 5);
             $searchData = [
                 'keywords'  => $keywords,
-                'sur'       => $surResults,
-                'inventory' => $inventoryResults,
+                'sur'       => $this->searchSUR($keywords, 5, $filter),
+                'inventory' => $this->searchInventory($keywords, 5, $filter),
             ];
-
-            // Estadísticas por entidad (filtrando por keywords)
-            $statsData = $this->buildStats($keywords);
+            $statsData = $this->buildStats($keywords, $filter);
         }
 
-        // Totales globales siempre presentes
+        // Totales: globales para admins, de la entidad para usuarios normales
         $globalTotals = [
-            'sur_total'        => AdministrativeAct::whereNull('deleted_at')->count(),
-            'inventario_total' => InventoryRecord::whereNull('deleted_at')->count(),
+            'sur_total'        => $this->countSUR($filter),
+            'inventario_total' => $this->countInventory($filter),
         ];
 
         return response()->json([
-            'pregunta'      => $rawQuery,
-            'keywords'      => $keywords,
+            'pregunta'         => $rawQuery,
+            'keywords'         => $keywords,
+            'access_level'     => $accessLevel,
+            'scope'            => $accessLevel === 'restricted'
+                ? ['entidad' => $entityName, 'dependencia' => $unitName]
+                : ['entidad' => 'Todas', 'dependencia' => 'Todas'],
             'totales_globales' => $globalTotals,
-            'busqueda'      => $searchData,
-            'estadisticas'  => $statsData,
+            'busqueda'         => $searchData,
+            'estadisticas'     => $statsData,
         ]);
     }
 
@@ -182,14 +217,18 @@ class ChatwootSearchController extends Controller
     // Helpers
     // ──────────────────────────────────────────────────────────────
 
-    private function buildStats(array $keywords): array
+    private function buildStats(array $keywords, ?array $filter = null): array
     {
         $surByEntity = AdministrativeAct::with('organizationalUnit.entity')
             ->whereNull('deleted_at')
-            ->whereHas('organizationalUnit.entity', function ($e) use ($keywords) {
-                foreach ($keywords as $kw) {
-                    $e->orWhere('name', 'like', "%{$kw}%");
-                }
+            ->when($filter, fn($q) => $q->whereHas('organizationalUnit',
+                fn($u) => $u->where('entity_id', $filter['entity_id'])))
+            ->when($keywords, function ($q) use ($keywords) {
+                $q->whereHas('organizationalUnit.entity', function ($e) use ($keywords) {
+                    foreach ($keywords as $kw) {
+                        $e->orWhere('name', 'like', "%{$kw}%");
+                    }
+                });
             })
             ->get()
             ->groupBy(fn($a) => $a->organizationalUnit?->entity?->name ?? 'Sin entidad')
@@ -204,10 +243,14 @@ class ChatwootSearchController extends Controller
 
         $invByEntity = InventoryRecord::with('organizationalUnit.entity')
             ->whereNull('deleted_at')
-            ->whereHas('organizationalUnit.entity', function ($e) use ($keywords) {
-                foreach ($keywords as $kw) {
-                    $e->orWhere('name', 'like', "%{$kw}%");
-                }
+            ->when($filter, fn($q) => $q->whereHas('organizationalUnit',
+                fn($u) => $u->where('entity_id', $filter['entity_id'])))
+            ->when($keywords, function ($q) use ($keywords) {
+                $q->whereHas('organizationalUnit.entity', function ($e) use ($keywords) {
+                    foreach ($keywords as $kw) {
+                        $e->orWhere('name', 'like', "%{$kw}%");
+                    }
+                });
             })
             ->get()
             ->groupBy(fn($r) => $r->organizationalUnit?->entity?->name ?? 'Sin entidad')
@@ -222,6 +265,22 @@ class ChatwootSearchController extends Controller
             'sur_por_entidad'        => $surByEntity,
             'inventario_por_entidad' => $invByEntity,
         ];
+    }
+
+    private function countSUR(?array $filter): int
+    {
+        return AdministrativeAct::whereNull('deleted_at')
+            ->when($filter, fn($q) => $q->whereHas('organizationalUnit',
+                fn($u) => $u->where('entity_id', $filter['entity_id'])))
+            ->count();
+    }
+
+    private function countInventory(?array $filter): int
+    {
+        return InventoryRecord::whereNull('deleted_at')
+            ->when($filter, fn($q) => $q->whereHas('organizationalUnit',
+                fn($u) => $u->where('entity_id', $filter['entity_id'])))
+            ->count();
     }
 
     private function authorized(Request $request): bool
@@ -272,7 +331,7 @@ class ChatwootSearchController extends Controller
     // Búsqueda SUR
     // ──────────────────────────────────────────────────────────────
 
-    private function searchSUR(array $keywords, int $limit): array
+    private function searchSUR(array $keywords, int $limit, ?array $filter = null): array
     {
         $acts = AdministrativeAct::with([
             'organizationalUnit.entity',
@@ -280,6 +339,8 @@ class ChatwootSearchController extends Controller
             'documentarySubseries',
             'actClassification',
         ])
+            ->when($filter, fn($q) => $q->whereHas('organizationalUnit',
+                fn($u) => $u->where('entity_id', $filter['entity_id'])))
             ->where(function ($q) use ($keywords) {
                 foreach ($keywords as $kw) {
                     $q->orWhere('filing_number', 'like', "%{$kw}%")
@@ -312,7 +373,7 @@ class ChatwootSearchController extends Controller
     // Búsqueda Inventario
     // ──────────────────────────────────────────────────────────────
 
-    private function searchInventory(array $keywords, int $limit): array
+    private function searchInventory(array $keywords, int $limit, ?array $filter = null): array
     {
         $records = InventoryRecord::with([
             'organizationalUnit.entity',
@@ -320,6 +381,8 @@ class ChatwootSearchController extends Controller
             'documentarySubseries',
             'storageMedium',
         ])
+            ->when($filter, fn($q) => $q->whereHas('organizationalUnit',
+                fn($u) => $u->where('entity_id', $filter['entity_id'])))
             ->where(function ($q) use ($keywords) {
                 foreach ($keywords as $kw) {
                     $q->orWhere('title', 'like', "%{$kw}%")
