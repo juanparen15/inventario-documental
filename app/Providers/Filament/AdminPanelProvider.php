@@ -67,32 +67,12 @@ class AdminPanelProvider extends PanelProvider
                       var CW_EMAIL = '{$email}';
                       var CW_NAME  = '{$name}';
 
-                      function cwIdentify() {
-                        localStorage.setItem('cw_user_email', CW_EMAIL);
-                        window.\$chatwoot.setUser(CW_EMAIL, { name: CW_NAME, email: CW_EMAIL });
-                        // Atributo confiable para filtrado por rol (independiente de la identidad del contacto)
-                        window.\$chatwoot.setCustomAttributes({ filament_email: CW_EMAIL });
-                      }
-
                       window.addEventListener('chatwoot:ready', function() {
-                        var prevEmail = localStorage.getItem('cw_user_email');
-
-                        if (prevEmail && prevEmail !== CW_EMAIL) {
-                          // Cambió el usuario: limpiar y hacer reset
-                          localStorage.removeItem('cw_user_email');
-                          window.\$chatwoot.reset();
-                          // chatwoot:ready debería disparar de nuevo tras el reset;
-                          // timeout como respaldo por si el SDK no lo hace
-                          setTimeout(function() {
-                            if (!localStorage.getItem('cw_user_email')) {
-                              cwIdentify();
-                            }
-                          }, 2000);
-                          return;
-                        }
-
-                        // Primera vez o después del reset (via chatwoot:ready)
-                        cwIdentify();
+                        // Identificar al usuario de Filament en el contacto de Chatwoot
+                        window.\$chatwoot.setUser(CW_EMAIL, { name: CW_NAME, email: CW_EMAIL });
+                        // Atributo confiable para filtrado por rol: siempre refleja quién
+                        // está logueado en Filament, independientemente del contacto del SDK
+                        window.\$chatwoot.setCustomAttributes({ filament_email: CW_EMAIL });
                       });
                     }
                   })(document,"script");
