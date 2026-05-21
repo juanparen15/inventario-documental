@@ -53,7 +53,17 @@ class ChatwootSearchController extends Controller
                     $entityId    = $unit?->entity?->id;
                     $entityName  = $unit?->entity?->name;
                 }
+                // else: super_admin / supervisor → accessLevel permanece 'full'
+            } else {
+                // Email recibido pero no existe en la BD → usuario desconocido.
+                // Restringir sin entidad: no se devuelve ningún registro.
+                $accessLevel = 'restricted';
+                $entityName  = 'Desconocido';
             }
+        } else {
+            // Sin email (contacto anónimo) → también restringido sin datos.
+            $accessLevel = 'restricted';
+            $entityName  = 'Anónimo';
         }
 
         $filter = $accessLevel === 'restricted'
