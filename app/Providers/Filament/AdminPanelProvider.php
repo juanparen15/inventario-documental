@@ -52,7 +52,7 @@ class AdminPanelProvider extends PanelProvider
 
                 return <<<HTML
                 <script>
-                  window.chatwootSettings = {"position":"right","type":"expanded_bubble","launcherTitle":"Chatbot"};
+                  window.chatwootSettings = {"position":"left","type":"expanded_bubble","launcherTitle":"Chatbot"};
                   (function(d,t) {
                     var BASE_URL="https://contactenos.ticsistemas.com.co";
                     var g=d.createElement(t),s=d.getElementsByTagName(t)[0];
@@ -77,18 +77,18 @@ class AdminPanelProvider extends PanelProvider
             },
         );
 
-        // WhatsApp Widget — CSS
-        FilamentView::registerRenderHook(
-            PanelsRenderHook::HEAD_END,
-            fn(): string => '<link rel="stylesheet" href="' . asset('vendor/whatsapp-widget/assets/app-CgZ3I7dV.css') . '">'
-                . '<style>.bottom-right{right:auto!important;left:30px!important}</style>',
-        );
+        // // WhatsApp Widget — CSS
+        // FilamentView::registerRenderHook(
+        //     PanelsRenderHook::HEAD_END,
+        //     fn(): string => '<link rel="stylesheet" href="' . asset('vendor/whatsapp-widget/assets/app-CgZ3I7dV.css') . '">'
+        //         . '<style>.bottom-right{right:auto!important;left:30px!important}</style>',
+        // );
 
-        // WhatsApp Widget — HTML + JS
-        FilamentView::registerRenderHook(
-            PanelsRenderHook::BODY_END,
-            fn(): \Illuminate\Contracts\View\View => view('whatsapp-widget::whatsapp-widget-body'),
-        );
+        // // WhatsApp Widget — HTML + JS
+        // FilamentView::registerRenderHook(
+        //     PanelsRenderHook::BODY_END,
+        //     fn(): \Illuminate\Contracts\View\View => view('whatsapp-widget::whatsapp-widget-body'),
+        // );
     }
 
     public function panel(Panel $panel): Panel
