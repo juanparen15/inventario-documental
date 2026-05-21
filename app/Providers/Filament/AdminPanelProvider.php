@@ -70,6 +70,8 @@ class AdminPanelProvider extends PanelProvider
                       function cwIdentify() {
                         localStorage.setItem('cw_user_email', CW_EMAIL);
                         window.\$chatwoot.setUser(CW_EMAIL, { name: CW_NAME, email: CW_EMAIL });
+                        // Atributo confiable para filtrado por rol (independiente de la identidad del contacto)
+                        window.\$chatwoot.setCustomAttributes({ filament_email: CW_EMAIL });
                       }
 
                       window.addEventListener('chatwoot:ready', function() {
