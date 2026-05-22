@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use Awcodes\LightSwitch\LightSwitchPlugin;
+use Moataz01\FilamentNotificationSound\FilamentNotificationSoundPlugin;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use JeffersonGoncalves\Filament\WhatsappWidget\WhatsappWidgetPlugin;
 use Filament\Http\Middleware\Authenticate;
@@ -165,6 +166,10 @@ class AdminPanelProvider extends PanelProvider
                 FilamentShieldPlugin::make(),
                 LightSwitchPlugin::make(),
                 WhatsappWidgetPlugin::make(),
+                FilamentNotificationSoundPlugin::make()
+                    ->volume(1.0)
+                    ->showAnimation(true)
+                    ->enabled(true),
             ]);
     }
 }
