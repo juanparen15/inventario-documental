@@ -23,7 +23,7 @@ class NotificarChatbotCommand extends Command
 
         $data = json_encode([
             'format'    => 'filament',
-            'title'     => '🤖 ¡Nuevo! Asistente con Inteligencia Artificial',
+            'title'     => 'Nuevo: Asistente con Inteligencia Artificial',
             'body'      => 'Ahora puedes consultar cualquier duda sobre la información almacenada en el sistema a través de nuestro chatbot con IA. Encuéntralo en la esquina inferior izquierda.',
             'icon'      => 'heroicon-o-cpu-chip',
             'iconColor' => 'primary',
