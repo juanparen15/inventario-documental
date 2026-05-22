@@ -22,6 +22,7 @@ class NotificarChatbotCommand extends Command
         }
 
         $data = json_encode([
+            'format'    => 'filament',
             'title'     => '¡Nuevo! Chat de soporte en línea',
             'body'      => 'Ya puedes contactarnos directamente desde el sistema. Haz clic en el ícono de chat en la esquina inferior derecha para iniciar una conversación con nuestro equipo.',
             'icon'      => 'heroicon-o-chat-bubble-left-right',
