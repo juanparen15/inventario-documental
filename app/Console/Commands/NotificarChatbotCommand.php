@@ -23,10 +23,10 @@ class NotificarChatbotCommand extends Command
 
         $data = json_encode([
             'format'    => 'filament',
-            'title'     => '¡Nuevo! Chat de soporte en línea',
-            'body'      => 'Ya puedes contactarnos directamente desde el sistema. Haz clic en el ícono de chat en la esquina inferior izquierda para iniciar una conversación con nuestro equipo.',
-            'icon'      => 'heroicon-o-chat-bubble-left-right',
-            'iconColor' => 'success',
+            'title'     => '🤖 ¡Nuevo! Asistente con Inteligencia Artificial',
+            'body'      => 'Ahora puedes consultar cualquier duda sobre la información almacenada en el sistema a través de nuestro chatbot con IA. Encuéntralo en la esquina inferior izquierda.',
+            'icon'      => 'heroicon-o-cpu-chip',
+            'iconColor' => 'primary',
             'status'    => 'success',
             'actions'   => [],
             'duration'  => 'persistent',
