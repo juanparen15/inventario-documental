@@ -8,6 +8,7 @@ use App\Models\InventoryRecord;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ChatwootSearchController extends Controller
 {
@@ -294,6 +295,31 @@ class ChatwootSearchController extends Controller
             ->count();
     }
 
+    /**
+     * Busca en el activity_log quién creó un modelo (evento 'created').
+     * Útil para registros con created_by = null (importaciones, migraciones antiguas).
+     *
+     * @param  string  $modelClass  FQCN del modelo, ej: App\Models\AdministrativeAct
+     * @param  int     $modelId
+     * @return string|null  Nombre del usuario o null si no hay registro
+     */
+    private function creatorFromActivityLog(string $modelClass, int $modelId): ?string
+    {
+        $row = DB::table('activity_log')
+            ->where('subject_type', $modelClass)
+            ->where('subject_id', $modelId)
+            ->where('event', 'created')
+            ->whereNotNull('causer_id')
+            ->orderBy('id')
+            ->first(['causer_id', 'causer_type']);
+
+        if (! $row) {
+            return null;
+        }
+
+        return User::find($row->causer_id)?->name;
+    }
+
     private function authorized(Request $request): bool
     {
         $token = $request->header('X-Chatwoot-Token') ?? $request->query('token');
@@ -382,7 +408,8 @@ class ChatwootSearchController extends Controller
             'folios'               => $act->folios,
             'notas'                => $act->notes,
             'razon_retraso_pdf'    => $act->late_upload_reason,
-            'creado_por'           => $act->creator?->name,
+            'creado_por'           => $act->creator?->name
+                                        ?? $this->creatorFromActivityLog(AdministrativeAct::class, $act->id),
             'fecha_creacion'       => $act->created_at?->format('d/m/Y H:i'),
             'actualizado_por'      => $act->updater?->name,
             'fecha_actualizacion'  => $act->updated_at?->format('d/m/Y H:i'),
@@ -439,7 +466,8 @@ class ChatwootSearchController extends Controller
             'tiene_digitalizado'        => ! empty($record->attachments),
             'nivel_prioridad'           => $record->priorityLevel?->name,
             'notas'                     => $record->notes,
-            'creado_por'                => $record->creator?->name,
+            'creado_por'                => $record->creator?->name
+                                            ?? $this->creatorFromActivityLog(InventoryRecord::class, $record->id),
             'fecha_creacion'            => $record->created_at?->format('d/m/Y H:i'),
             'actualizado_por'           => $record->updater?->name,
             'fecha_actualizacion'       => $record->updated_at?->format('d/m/Y H:i'),
