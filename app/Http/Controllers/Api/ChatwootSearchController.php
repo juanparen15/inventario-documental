@@ -350,6 +350,7 @@ class ChatwootSearchController extends Controller
             'documentarySubseries',
             'actClassification',
             'creator',
+            'updater',
         ])
             ->when($filter, fn($q) => $q->whereHas('organizationalUnit',
                 fn($u) => $u->where('entity_id', $filter['entity_id'])))
@@ -368,19 +369,23 @@ class ChatwootSearchController extends Controller
             ->get();
 
         return $acts->map(fn(AdministrativeAct $act) => [
-            'consecutivo'    => $act->filing_number,
-            'asunto'         => $act->subject,
-            'vigencia'       => $act->vigencia,
-            'serie'          => $act->documentarySeries?->name,
-            'subserie'       => $act->documentarySubseries?->name,
-            'entidad'        => $act->organizationalUnit?->entity?->name,
-            'dependencia'    => $act->organizationalUnit?->name,
-            'clasificacion'  => $act->actClassification?->name,
-            'tiene_pdf'      => ! $act->lacksPdf(),
-            'fecha_creacion' => $act->created_at?->format('d/m/Y'),
-            'creado_por'     => $act->creator?->name,
-            'notas'          => $act->notes,
-            'folios'         => $act->folios,
+            'consecutivo'          => $act->filing_number,
+            'asunto'               => $act->subject,
+            'vigencia'             => $act->vigencia,
+            'serie'                => $act->documentarySeries?->name,
+            'subserie'             => $act->documentarySubseries?->name,
+            'entidad'              => $act->organizationalUnit?->entity?->name,
+            'dependencia'          => $act->organizationalUnit?->name,
+            'clasificacion'        => $act->actClassification?->name,
+            'tiene_pdf'            => ! $act->lacksPdf(),
+            'tiene_confidencial'   => ! empty($act->confidential_attachments),
+            'folios'               => $act->folios,
+            'notas'                => $act->notes,
+            'razon_retraso_pdf'    => $act->late_upload_reason,
+            'creado_por'           => $act->creator?->name,
+            'fecha_creacion'       => $act->created_at?->format('d/m/Y H:i'),
+            'actualizado_por'      => $act->updater?->name,
+            'fecha_actualizacion'  => $act->updated_at?->format('d/m/Y H:i'),
         ])->toArray();
     }
 
@@ -397,6 +402,7 @@ class ChatwootSearchController extends Controller
             'storageMedium',
             'priorityLevel',
             'creator',
+            'updater',
         ])
             ->when($filter, fn($q) => $q->whereHas('organizationalUnit',
                 fn($u) => $u->where('entity_id', $filter['entity_id'])))
@@ -416,22 +422,27 @@ class ChatwootSearchController extends Controller
             ->get();
 
         return $records->map(fn(InventoryRecord $record) => [
-            'codigo_referencia'  => $record->reference_code,
-            'titulo'             => $record->title,
-            'descripcion'        => $record->description,
-            'serie'              => $record->documentarySeries?->name,
-            'subserie'           => $record->documentarySubseries?->name,
-            'entidad'            => $record->organizationalUnit?->entity?->name,
-            'dependencia'        => $record->organizationalUnit?->name,
-            'fechas'             => $record->date_range,
-            'ubicacion'          => $record->location,
-            'folios'             => $record->folios,
-            'soporte'            => $record->storageMedium?->name,
-            'objeto_inventario'  => InventoryRecord::INVENTORY_PURPOSES[$record->inventory_purpose] ?? $record->inventory_purpose,
-            'nivel_prioridad'    => $record->priorityLevel?->name,
-            'creado_por'         => $record->creator?->name,
-            'notas'              => $record->notes,
-            'fecha_creacion'     => $record->created_at?->format('d/m/Y'),
+            'codigo_referencia'         => $record->reference_code,
+            'titulo'                    => $record->title,
+            'descripcion'               => $record->description,
+            'serie'                     => $record->documentarySeries?->name,
+            'subserie'                  => $record->documentarySubseries?->name,
+            'entidad'                   => $record->organizationalUnit?->entity?->name,
+            'dependencia'               => $record->organizationalUnit?->name,
+            'objeto_inventario'         => InventoryRecord::INVENTORY_PURPOSES[$record->inventory_purpose] ?? $record->inventory_purpose,
+            'fechas'                    => $record->date_range,
+            'ubicacion'                 => $record->location,
+            'folios'                    => $record->folios,
+            'soporte'                   => $record->storageMedium?->name,
+            'tipo_unidad_almacenamiento' => InventoryRecord::STORAGE_UNIT_TYPES[$record->storage_unit_type] ?? $record->storage_unit_type,
+            'cantidad_unidades'         => $record->storage_unit_quantity,
+            'tiene_digitalizado'        => ! empty($record->attachments),
+            'nivel_prioridad'           => $record->priorityLevel?->name,
+            'notas'                     => $record->notes,
+            'creado_por'                => $record->creator?->name,
+            'fecha_creacion'            => $record->created_at?->format('d/m/Y H:i'),
+            'actualizado_por'           => $record->updater?->name,
+            'fecha_actualizacion'       => $record->updated_at?->format('d/m/Y H:i'),
         ])->toArray();
     }
 }
