@@ -349,6 +349,7 @@ class ChatwootSearchController extends Controller
             'documentarySeries',
             'documentarySubseries',
             'actClassification',
+            'creator',
         ])
             ->when($filter, fn($q) => $q->whereHas('organizationalUnit',
                 fn($u) => $u->where('entity_id', $filter['entity_id'])))
@@ -367,16 +368,19 @@ class ChatwootSearchController extends Controller
             ->get();
 
         return $acts->map(fn(AdministrativeAct $act) => [
-            'consecutivo'   => $act->filing_number,
-            'asunto'        => $act->subject,
-            'vigencia'      => $act->vigencia,
-            'serie'         => $act->documentarySeries?->name,
-            'subserie'      => $act->documentarySubseries?->name,
-            'entidad'       => $act->organizationalUnit?->entity?->name,
-            'dependencia'   => $act->organizationalUnit?->name,
-            'clasificacion' => $act->actClassification?->name,
-            'tiene_pdf'     => ! $act->lacksPdf(),
+            'consecutivo'    => $act->filing_number,
+            'asunto'         => $act->subject,
+            'vigencia'       => $act->vigencia,
+            'serie'          => $act->documentarySeries?->name,
+            'subserie'       => $act->documentarySubseries?->name,
+            'entidad'        => $act->organizationalUnit?->entity?->name,
+            'dependencia'    => $act->organizationalUnit?->name,
+            'clasificacion'  => $act->actClassification?->name,
+            'tiene_pdf'      => ! $act->lacksPdf(),
             'fecha_creacion' => $act->created_at?->format('d/m/Y'),
+            'creado_por'     => $act->creator?->name,
+            'notas'          => $act->notes,
+            'folios'         => $act->folios,
         ])->toArray();
     }
 
@@ -391,6 +395,8 @@ class ChatwootSearchController extends Controller
             'documentarySeries',
             'documentarySubseries',
             'storageMedium',
+            'priorityLevel',
+            'creator',
         ])
             ->when($filter, fn($q) => $q->whereHas('organizationalUnit',
                 fn($u) => $u->where('entity_id', $filter['entity_id'])))
@@ -410,17 +416,22 @@ class ChatwootSearchController extends Controller
             ->get();
 
         return $records->map(fn(InventoryRecord $record) => [
-            'codigo_referencia' => $record->reference_code,
-            'titulo'            => $record->title,
-            'descripcion'       => $record->description,
-            'serie'             => $record->documentarySeries?->name,
-            'subserie'          => $record->documentarySubseries?->name,
-            'entidad'           => $record->organizationalUnit?->entity?->name,
-            'dependencia'       => $record->organizationalUnit?->name,
-            'fechas'            => $record->date_range,
-            'ubicacion'         => $record->location,
-            'folios'            => $record->folios,
-            'soporte'           => $record->storageMedium?->name,
+            'codigo_referencia'  => $record->reference_code,
+            'titulo'             => $record->title,
+            'descripcion'        => $record->description,
+            'serie'              => $record->documentarySeries?->name,
+            'subserie'           => $record->documentarySubseries?->name,
+            'entidad'            => $record->organizationalUnit?->entity?->name,
+            'dependencia'        => $record->organizationalUnit?->name,
+            'fechas'             => $record->date_range,
+            'ubicacion'          => $record->location,
+            'folios'             => $record->folios,
+            'soporte'            => $record->storageMedium?->name,
+            'objeto_inventario'  => InventoryRecord::INVENTORY_PURPOSES[$record->inventory_purpose] ?? $record->inventory_purpose,
+            'nivel_prioridad'    => $record->priorityLevel?->name,
+            'creado_por'         => $record->creator?->name,
+            'notas'              => $record->notes,
+            'fecha_creacion'     => $record->created_at?->format('d/m/Y'),
         ])->toArray();
     }
 }
