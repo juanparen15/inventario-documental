@@ -75,11 +75,16 @@ class ChatwootSearchController extends Controller
         $searchData = [];
         $statsData  = [];
 
-        if (! empty($keywords)) {
+        // Extraer patrones de radicado/código del texto original (antes de normalizar).
+        // El keyword extractor solo captura letras puras; los radicados como
+        // "2026.ITT.24.01.309.SUR" quedan fuera y se necesita búsqueda directa.
+        $filingCandidates = $this->extractFilingCandidates($rawQuery);
+
+        if (! empty($keywords) || ! empty($filingCandidates)) {
             $searchData = [
                 'keywords'  => $keywords,
-                'sur'       => $this->searchSUR($keywords, 5, $filter),
-                'inventory' => $this->searchInventory($keywords, 5, $filter),
+                'sur'       => $this->searchSUR($keywords, 5, $filter, $filingCandidates),
+                'inventory' => $this->searchInventory($keywords, 5, $filter, $filingCandidates),
             ];
             $statsData = $this->buildStats($keywords, $filter);
         }
@@ -364,11 +369,37 @@ class ChatwootSearchController extends Controller
         return array_slice($keywords, 0, 5); // máx 5 keywords
     }
 
+    /**
+     * Extrae posibles números de radicado (SUR) y códigos de referencia (FUID)
+     * del texto original, antes de la normalización de keywords.
+     *
+     * Ejemplos detectados:
+     *   - 2026.ITT.24.01.309.SUR
+     *   - 2026-SGA-AR-000290
+     *   - 2025.SP.01.002.SUR
+     */
+    private function extractFilingCandidates(string $text): array
+    {
+        $candidates = [];
+
+        // Patrón SUR/FUID con puntos: YYYY.SIGLAS.X.X...
+        preg_match_all(
+            '/\b\d{4}[.\-][A-Z0-9]{2,}(?:[.\-][A-Z0-9]+){1,6}\b/i',
+            $text,
+            $matches
+        );
+        if (! empty($matches[0])) {
+            $candidates = array_merge($candidates, $matches[0]);
+        }
+
+        return array_values(array_unique($candidates));
+    }
+
     // ──────────────────────────────────────────────────────────────
     // Búsqueda SUR
     // ──────────────────────────────────────────────────────────────
 
-    private function searchSUR(array $keywords, int $limit, ?array $filter = null): array
+    private function searchSUR(array $keywords, int $limit, ?array $filter = null, array $filingCandidates = []): array
     {
         $acts = AdministrativeAct::with([
             'organizationalUnit.entity',
@@ -380,7 +411,7 @@ class ChatwootSearchController extends Controller
         ])
             ->when($filter, fn($q) => $q->whereHas('organizationalUnit',
                 fn($u) => $u->where('entity_id', $filter['entity_id'])))
-            ->where(function ($q) use ($keywords) {
+            ->where(function ($q) use ($keywords, $filingCandidates) {
                 foreach ($keywords as $kw) {
                     $q->orWhere('filing_number', 'like', "%{$kw}%")
                       ->orWhere('subject', 'like', "%{$kw}%")
@@ -388,6 +419,10 @@ class ChatwootSearchController extends Controller
                       ->orWhereHas('documentarySubseries', fn($s) => $s->where('name', 'like', "%{$kw}%"))
                       ->orWhereHas('organizationalUnit', fn($u) => $u->where('name', 'like', "%{$kw}%"))
                       ->orWhereHas('organizationalUnit.entity', fn($e) => $e->where('name', 'like', "%{$kw}%"));
+                }
+                // Búsqueda directa por número de radicado
+                foreach ($filingCandidates as $candidate) {
+                    $q->orWhere('filing_number', 'like', "%{$candidate}%");
                 }
             })
             ->orderByDesc('created_at')
@@ -420,7 +455,7 @@ class ChatwootSearchController extends Controller
     // Búsqueda Inventario
     // ──────────────────────────────────────────────────────────────
 
-    private function searchInventory(array $keywords, int $limit, ?array $filter = null): array
+    private function searchInventory(array $keywords, int $limit, ?array $filter = null, array $filingCandidates = []): array
     {
         $records = InventoryRecord::with([
             'organizationalUnit.entity',
@@ -433,7 +468,7 @@ class ChatwootSearchController extends Controller
         ])
             ->when($filter, fn($q) => $q->whereHas('organizationalUnit',
                 fn($u) => $u->where('entity_id', $filter['entity_id'])))
-            ->where(function ($q) use ($keywords) {
+            ->where(function ($q) use ($keywords, $filingCandidates) {
                 foreach ($keywords as $kw) {
                     $q->orWhere('title', 'like', "%{$kw}%")
                       ->orWhere('description', 'like', "%{$kw}%")
@@ -442,6 +477,10 @@ class ChatwootSearchController extends Controller
                       ->orWhereHas('documentarySubseries', fn($s) => $s->where('name', 'like', "%{$kw}%"))
                       ->orWhereHas('organizationalUnit', fn($u) => $u->where('name', 'like', "%{$kw}%"))
                       ->orWhereHas('organizationalUnit.entity', fn($e) => $e->where('name', 'like', "%{$kw}%"));
+                }
+                // Búsqueda directa por código de referencia
+                foreach ($filingCandidates as $candidate) {
+                    $q->orWhere('reference_code', 'like', "%{$candidate}%");
                 }
             })
             ->orderByDesc('created_at')
