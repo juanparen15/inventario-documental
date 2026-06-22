@@ -285,6 +285,24 @@ class AdministrativeActResource extends Resource
                             ->content(fn(?AdministrativeAct $record) => $record?->late_upload_reason ?? '—'),
                     ])
                     ->hidden(fn(?AdministrativeAct $record) => empty($record?->late_upload_reason)),
+
+                Forms\Components\Section::make('Registro anulado')
+                    ->icon('heroicon-o-no-symbol')
+                    ->iconColor('danger')
+                    ->columns(3)
+                    ->schema([
+                        Forms\Components\Placeholder::make('annulment_reason_display')
+                            ->label('Motivo de anulación')
+                            ->columnSpanFull()
+                            ->content(fn(?AdministrativeAct $record) => $record?->annulment_reason ?? '—'),
+                        Forms\Components\Placeholder::make('annulled_by_display')
+                            ->label('Anulado por')
+                            ->content(fn(?AdministrativeAct $record) => $record?->annuller?->name ?? '—'),
+                        Forms\Components\Placeholder::make('annulled_at_display')
+                            ->label('Fecha de anulación')
+                            ->content(fn(?AdministrativeAct $record) => $record?->deleted_at?->format('d/m/Y H:i') ?? '—'),
+                    ])
+                    ->visible(fn(?AdministrativeAct $record) => (bool) $record?->trashed()),
             ]);
     }
 
@@ -450,7 +468,11 @@ class AdministrativeActResource extends Resource
                             ->when($data['until'], fn(Builder $query, $date) => $query->whereDate('created_at', '<=', $date));
                     }),
 
-                Tables\Filters\TrashedFilter::make(),
+                Tables\Filters\TrashedFilter::make()
+                    ->label('Estado de anulación')
+                    ->placeholder('Solo vigentes')
+                    ->trueLabel('Vigentes y anulados')
+                    ->falseLabel('Solo anulados'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
@@ -601,12 +623,79 @@ class AdministrativeActResource extends Resource
                     })
                     ->successNotificationTitle('Documento subido correctamente'),
 
-                Tables\Actions\DeleteAction::make(),
-                Tables\Actions\RestoreAction::make(),
+                Tables\Actions\Action::make('anular')
+                    ->label('Anular')
+                    ->icon('heroicon-o-no-symbol')
+                    ->color('danger')
+                    ->visible(fn(AdministrativeAct $record) =>
+                        ! $record->trashed() &&
+                        (auth()->user()?->hasRole('super_admin') || auth()->id() == $record->created_by)
+                    )
+                    ->modalHeading('Anular registro')
+                    ->modalDescription('El registro se ocultará del listado y quedará excluido de los informes vigentes. Podrás consultarlo con el filtro «Anulados» y restaurarlo después. Esta acción queda en el registro de actividad.')
+                    ->modalIcon('heroicon-o-no-symbol')
+                    ->modalSubmitActionLabel('Anular registro')
+                    ->form([
+                        Forms\Components\Textarea::make('annulment_reason')
+                            ->label('Motivo de anulación')
+                            ->placeholder('Explique por qué se anula este registro.')
+                            ->required()
+                            ->maxLength(1000)
+                            ->rows(3),
+                    ])
+                    ->action(function (AdministrativeAct $record, array $data): void {
+                        // Guardar los datos de anulación sin generar un log de "actualizado";
+                        // el evento de soft-delete (delete) registra la anulación con su motivo.
+                        $record->disableLogging();
+                        $record->annulment_reason = $data['annulment_reason'];
+                        $record->annulled_by      = auth()->id();
+                        $record->save();
+                        $record->enableLogging();
+
+                        $record->delete();
+                    })
+                    ->successNotificationTitle('Registro anulado'),
+
+                Tables\Actions\RestoreAction::make()
+                    ->label('Restaurar')
+                    ->successNotificationTitle('Anulación revertida'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\BulkAction::make('anularBulk')
+                        ->label('Anular seleccionados')
+                        ->icon('heroicon-o-no-symbol')
+                        ->color('danger')
+                        ->visible(fn() => auth()->user()?->hasRole('super_admin'))
+                        ->modalHeading('Anular registros seleccionados')
+                        ->modalDescription('Se anularán todos los registros seleccionados con el mismo motivo. Quedarán ocultos del listado y disponibles con el filtro «Anulados».')
+                        ->modalIcon('heroicon-o-no-symbol')
+                        ->modalSubmitActionLabel('Anular registros')
+                        ->form([
+                            Forms\Components\Textarea::make('annulment_reason')
+                                ->label('Motivo de anulación')
+                                ->placeholder('Explique por qué se anulan estos registros.')
+                                ->required()
+                                ->maxLength(1000)
+                                ->rows(3),
+                        ])
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records, array $data): void {
+                            foreach ($records as $record) {
+                                if ($record->trashed()) {
+                                    continue;
+                                }
+                                $record->disableLogging();
+                                $record->annulment_reason = $data['annulment_reason'];
+                                $record->annulled_by      = auth()->id();
+                                $record->save();
+                                $record->enableLogging();
+
+                                $record->delete();
+                            }
+                        })
+                        ->deselectRecordsAfterCompletion()
+                        ->successNotificationTitle('Registros anulados'),
+
                     Tables\Actions\ForceDeleteBulkAction::make(),
                     Tables\Actions\RestoreBulkAction::make(),
                 ]),

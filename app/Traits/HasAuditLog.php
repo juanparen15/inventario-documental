@@ -41,14 +41,23 @@ trait HasAuditLog
         // Tipo de modelo en español
         $modelLabel = ActivityFormatter::modelLabel(get_class($this));
 
+        // ¿Es una eliminación permanente (forceDelete) o una anulación (soft delete)?
+        $isForceDelete = method_exists($this, 'isForceDeleting') && $this->isForceDeleting();
+        $isAnnulled    = ! $isForceDelete && ! empty($this->annulment_reason);
+
         // Verbo de la acción
         $verb = match ($eventName) {
             'created'  => 'registrado',
             'updated'  => 'actualizado',
-            'deleted'  => 'eliminado',
+            'deleted'  => $isForceDelete ? 'eliminado definitivamente' : ($isAnnulled ? 'anulado' : 'eliminado'),
             'restored' => 'restaurado',
             default    => $eventName,
         };
+
+        // Para 'deleted' por anulación: añadir el motivo
+        if ($eventName === 'deleted' && $isAnnulled) {
+            $verb .= ' — Motivo: ' . $this->annulment_reason;
+        }
 
         // Para 'updated': añadir qué campos cambiaron
         if ($eventName === 'updated') {

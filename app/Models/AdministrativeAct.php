@@ -25,6 +25,8 @@ class AdministrativeAct extends Model
         'attachments',
         'confidential_attachments',
         'late_upload_reason',
+        'annulment_reason',
+        'annulled_by',
         'folios',
         'pdf_notified_days',
         'slug',
@@ -75,6 +77,12 @@ class AdministrativeAct extends Model
             if (auth()->check()) {
                 $model->updated_by = auth()->id();
             }
+        });
+
+        // Al restaurar (revertir la anulación) se limpian los datos de anulación.
+        static::restoring(function ($model) {
+            $model->annulment_reason = null;
+            $model->annulled_by      = null;
         });
     }
 
@@ -224,5 +232,11 @@ class AdministrativeAct extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /** Usuario que anuló el registro. */
+    public function annuller(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'annulled_by');
     }
 }

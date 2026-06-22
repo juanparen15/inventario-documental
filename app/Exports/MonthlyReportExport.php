@@ -27,6 +27,7 @@ class MonthlyReportExport implements WithMultipleSheets
             new MonthlyReportResumenSheet($this->month, $this->year),
             new MonthlyReportUnidadesSheet($this->month, $this->year),
             new MonthlyReportSinPdfSheet($this->month, $this->year),
+            new MonthlyReportAnuladosSheet($this->month, $this->year),
         ];
     }
 }
@@ -207,6 +208,82 @@ class MonthlyReportUnidadesSheet implements FromArray, WithTitle, ShouldAutoSize
                 $lastRow = $sheet->getHighestRow();
                 if ($lastRow > 3) {
                     $sheet->getStyle("A3:D{$lastRow}")->applyFromArray([
+                        'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'e5e7eb']]],
+                    ]);
+                }
+                $sheet->getRowDimension(1)->setRowHeight(24);
+            },
+        ];
+    }
+}
+
+// ─── Hoja 4: Documentos Anulados ─────────────────────────────────────────────
+
+class MonthlyReportAnuladosSheet implements FromArray, WithTitle, ShouldAutoSize, WithEvents
+{
+    private string $monthLabel;
+
+    public function __construct(private readonly int $month, private readonly int $year)
+    {
+        $this->monthLabel = Carbon::createFromDate($year, $month, 1)->locale('es')->isoFormat('MMMM YYYY');
+    }
+
+    public function title(): string { return 'Anulados'; }
+
+    public function array(): array
+    {
+        $rows = [
+            ['DOCUMENTOS ANULADOS DURANTE EL PERÍODO — ' . mb_strtoupper($this->monthLabel)],
+            ['Generado:', now()->format('d/m/Y H:i')],
+            [],
+            ['Consecutivo', 'Entidad', 'Unidad', 'Objeto / Asunto', 'Motivo de anulación', 'Anulado por', 'Fecha de anulación'],
+        ];
+
+        $annulled = AdministrativeAct::onlyTrashed()
+            ->with(['organizationalUnit.entity', 'annuller'])
+            ->whereYear('deleted_at', $this->year)
+            ->whereMonth('deleted_at', $this->month)
+            ->orderBy('deleted_at')
+            ->get();
+
+        foreach ($annulled as $act) {
+            $rows[] = [
+                $act->filing_number,
+                $act->organizationalUnit?->entity?->name ?? '—',
+                $act->organizationalUnit?->name ?? '—',
+                $act->subject,
+                $act->annulment_reason ?? '—',
+                $act->annuller?->name ?? '—',
+                $act->deleted_at?->format('d/m/Y H:i') ?? '—',
+            ];
+        }
+
+        if (count($rows) === 4) {
+            $rows[] = ['', '', '', 'No se anularon documentos durante este período.', '', '', ''];
+        }
+
+        return $rows;
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function (AfterSheet $event) {
+                $sheet = $event->sheet->getDelegate();
+                $sheet->mergeCells('A1:G1');
+                $sheet->getStyle('A1')->applyFromArray([
+                    'font'      => ['bold' => true, 'size' => 13, 'color' => ['rgb' => 'FFFFFF']],
+                    'fill'      => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => '475569']],
+                    'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+                ]);
+                $sheet->getStyle('A4:G4')->applyFromArray([
+                    'font'      => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                    'fill'      => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => '64748b']],
+                    'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+                ]);
+                $lastRow = $sheet->getHighestRow();
+                if ($lastRow > 4) {
+                    $sheet->getStyle("A4:G{$lastRow}")->applyFromArray([
                         'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'e5e7eb']]],
                     ]);
                 }

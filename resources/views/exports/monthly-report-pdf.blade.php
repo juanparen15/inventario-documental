@@ -745,6 +745,48 @@
         @endif
     </div>
 
+    {{-- ══════════════════════════════════════════════
+         DOCUMENTOS ANULADOS DURANTE EL PERÍODO
+    ══════════════════════════════════════════════ --}}
+    @if(isset($annulled) && $annulled->isNotEmpty())
+    <div class="section">
+        <div class="section-header clearfix" style="background:#475569;">
+            <span class="section-title">Documentos anulados durante el periodo</span>
+            <span class="section-badge">{{ $annulled->count() }} anulado{{ $annulled->count() !== 1 ? 's' : '' }}</span>
+        </div>
+        <div class="section-body" style="border-color:#cbd5e1;">
+            <table class="pending-table">
+                <thead>
+                    <tr>
+                        <th style="width:12%; background:#475569;">Consecutivo</th>
+                        <th style="width:20%; background:#475569;">Unidad / Entidad</th>
+                        <th style="width:28%; background:#475569;">Objeto / Asunto</th>
+                        <th style="width:24%; background:#475569;">Motivo de anulacion</th>
+                        <th style="width:16%; background:#475569;">Anulado por / fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($annulled as $act)
+                        <tr>
+                            <td class="mono">{{ $act->filing_number }}</td>
+                            <td>
+                                <span style="font-weight:600; color:#1e293b;">{{ $act->organizationalUnit?->name ?? '—' }}</span><br>
+                                <span style="font-size:7.5px; color:#9ca3af;">{{ $act->organizationalUnit?->entity?->name ?? '—' }}</span>
+                            </td>
+                            <td style="color:#374151;">{{ Str::limit($act->subject, 60) }}</td>
+                            <td style="color:#374151;">{{ Str::limit($act->annulment_reason, 70) }}</td>
+                            <td>
+                                <span style="font-weight:600; color:#1e293b;">{{ $act->annuller?->name ?? '—' }}</span><br>
+                                <span class="mono" style="font-size:7.5px; color:#9ca3af;">{{ $act->deleted_at?->format('d/m/Y H:i') }}</span>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @endif
+
     </div>{{-- /body-content --}}
 
     {{-- ══════════════════════════════════════════════

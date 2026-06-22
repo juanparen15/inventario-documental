@@ -86,12 +86,21 @@ Route::middleware(['auth'])->group(function () {
 
         $pending = $noPdf(AdministrativeAct::with(['organizationalUnit.entity'])->whereNull('deleted_at'))->orderBy('created_at')->get();
 
+        // Documentos anulados durante el período (por fecha de anulación)
+        $annulled = AdministrativeAct::onlyTrashed()
+            ->with(['organizationalUnit.entity', 'annuller'])
+            ->whereYear('deleted_at', $year)
+            ->whereMonth('deleted_at', $month)
+            ->orderBy('deleted_at')
+            ->get();
+
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.monthly-report-pdf', [
             'monthLabel'       => Carbon::createFromDate($year, $month, 1)->locale('es')->isoFormat('MMMM YYYY'),
             'kpis'             => $kpis,
             'stats'            => $stats,
             'complianceByUnit' => $complianceByUnit,
             'pending'          => $pending,
+            'annulled'         => $annulled,
         ])->setPaper('a4', 'portrait');
 
         return $pdf->download("informe-mensual-{$label}.pdf");

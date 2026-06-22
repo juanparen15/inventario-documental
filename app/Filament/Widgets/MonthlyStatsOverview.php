@@ -56,6 +56,12 @@ class MonthlyStatsOverview extends BaseWidget
             ? round(($totalAll - $sinPdf) / $totalAll * 100, 1)
             : 100.0;
 
+        // Documentos anulados durante el período (por fecha de anulación = deleted_at)
+        $anulados = AdministrativeAct::onlyTrashed()
+            ->whereYear('deleted_at', $this->year)
+            ->whereMonth('deleted_at', $this->month)
+            ->count();
+
         // Mini chart: últimos 7 meses de actos del período (solo ese mes por año)
         $trendChart = collect(range(6, 0))->map(fn($i) => (int) AdministrativeAct::whereNull('deleted_at')
             ->whereYear('created_at', now()->subMonths($i)->year)
@@ -125,6 +131,18 @@ class MonthlyStatsOverview extends BaseWidget
                     ? ($porVencer > 0 ? 'warning' : 'success')
                     : 'danger'
                 ),
+
+            // ── Anulados del período ─────────────────────────────────────
+            Stat::make('Documentos anulados', number_format($anulados))
+                ->description($anulados === 0
+                    ? 'Sin anulaciones este mes'
+                    : 'Anulados durante el período'
+                )
+                ->descriptionIcon($anulados === 0
+                    ? 'heroicon-m-check-circle'
+                    : 'heroicon-m-no-symbol'
+                )
+                ->color($anulados === 0 ? 'success' : 'danger'),
         ];
     }
 }
