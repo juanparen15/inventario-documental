@@ -656,8 +656,19 @@ class AdministrativeActResource extends Resource
                     })
                     ->successNotificationTitle('Registro anulado'),
 
-                Tables\Actions\RestoreAction::make()
+                Tables\Actions\Action::make('restaurar')
                     ->label('Restaurar')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading('Restaurar registro')
+                    ->modalDescription('El registro volverá a estar vigente y se quitará la anulación.')
+                    ->modalSubmitActionLabel('Restaurar')
+                    ->visible(fn(AdministrativeAct $record) =>
+                        $record->trashed() &&
+                        (auth()->user()?->hasRole('super_admin') || auth()->id() == $record->created_by)
+                    )
+                    ->action(fn(AdministrativeAct $record) => $record->restore())
                     ->successNotificationTitle('Anulación revertida'),
             ])
             ->bulkActions([
@@ -696,8 +707,26 @@ class AdministrativeActResource extends Resource
                         ->deselectRecordsAfterCompletion()
                         ->successNotificationTitle('Registros anulados'),
 
+                    Tables\Actions\BulkAction::make('restaurarBulk')
+                        ->label('Restaurar seleccionados')
+                        ->icon('heroicon-o-arrow-uturn-left')
+                        ->color('success')
+                        ->visible(fn() => auth()->user()?->hasRole('super_admin'))
+                        ->requiresConfirmation()
+                        ->modalHeading('Restaurar registros seleccionados')
+                        ->modalDescription('Los registros anulados volverán a estar vigentes.')
+                        ->modalSubmitActionLabel('Restaurar')
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records): void {
+                            foreach ($records as $record) {
+                                if ($record->trashed()) {
+                                    $record->restore();
+                                }
+                            }
+                        })
+                        ->deselectRecordsAfterCompletion()
+                        ->successNotificationTitle('Anulaciones revertidas'),
+
                     Tables\Actions\ForceDeleteBulkAction::make(),
-                    Tables\Actions\RestoreBulkAction::make(),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');

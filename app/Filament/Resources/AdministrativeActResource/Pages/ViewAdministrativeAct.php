@@ -67,6 +67,29 @@ class ViewAdministrativeAct extends ViewRecord
 
                     $this->redirect(AdministrativeActResource::getUrl('index'));
                 }),
+
+            Actions\Action::make('restaurar')
+                ->label('Restaurar')
+                ->icon('heroicon-o-arrow-uturn-left')
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalHeading('Restaurar registro')
+                ->modalDescription('El registro volverá a estar vigente y se quitará la anulación.')
+                ->modalSubmitActionLabel('Restaurar')
+                ->visible(fn() =>
+                    $this->record->trashed() &&
+                    (auth()->user()?->hasRole('super_admin') || auth()->id() == $this->record->created_by)
+                )
+                ->action(function (): void {
+                    $this->record->restore();
+
+                    \Filament\Notifications\Notification::make()
+                        ->title('Anulación revertida')
+                        ->success()
+                        ->send();
+
+                    $this->redirect(AdministrativeActResource::getUrl('index'));
+                }),
         ];
     }
 }
