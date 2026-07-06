@@ -16,6 +16,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class AdministrativeActResource extends Resource
 {
@@ -213,6 +214,7 @@ class AdministrativeActResource extends Resource
                             ->multiple()
                             ->acceptedFileTypes(['application/pdf'])
                             ->maxSize(204800)
+                            ->getUploadedFileNameForStorageUsing(fn(TemporaryUploadedFile $file): string => static::safeStorageName($file))
                             ->downloadable()
                             ->openable()
                             ->reorderable()
@@ -263,6 +265,7 @@ class AdministrativeActResource extends Resource
                             ->multiple()
                             ->acceptedFileTypes(['application/pdf'])
                             ->maxSize(204800)
+                            ->getUploadedFileNameForStorageUsing(fn(TemporaryUploadedFile $file): string => static::safeStorageName($file))
                             ->downloadable()
                             ->openable()
                             ->reorderable(),
@@ -561,6 +564,7 @@ class AdministrativeActResource extends Resource
                             ->multiple()
                             ->acceptedFileTypes(['application/pdf'])
                             ->maxSize(204800)
+                            ->getUploadedFileNameForStorageUsing(fn(TemporaryUploadedFile $file): string => static::safeStorageName($file))
                             ->hidden(fn(Get $get) => $get('is_confidential') && !auth()->user()?->hasRole('supervisor'))
                             ->required(fn(Get $get) => !$get('is_confidential') || auth()->user()?->hasRole('supervisor')),
 
@@ -570,6 +574,7 @@ class AdministrativeActResource extends Resource
                             ->multiple()
                             ->acceptedFileTypes(['application/pdf'])
                             ->maxSize(204800)
+                            ->getUploadedFileNameForStorageUsing(fn(TemporaryUploadedFile $file): string => static::safeStorageName($file))
                             ->hidden(fn(Get $get) => !$get('is_confidential') || auth()->user()?->hasRole('supervisor'))
                             ->required(fn(Get $get) => $get('is_confidential') && !auth()->user()?->hasRole('supervisor')),
 
@@ -782,6 +787,16 @@ class AdministrativeActResource extends Resource
             return '0';
         }
         return static::getModel()::count();
+    }
+
+    /**
+     * Genera un nombre de almacenamiento seguro y único para cualquier archivo.
+     * Neutraliza nombres con tildes, comas, puntos, espacios o excesivamente largos,
+     * de modo que el archivo siempre pueda guardarse sin importar su nombre original.
+     */
+    public static function safeStorageName(TemporaryUploadedFile $file): string
+    {
+        return \App\Support\FileStorage::safeName($file);
     }
 
     /**

@@ -316,6 +316,7 @@ class InventoryRecordResource extends Resource
                             ->multiple()
                             ->acceptedFileTypes(['application/pdf'])
                             ->maxSize(20480) // 20MB
+                            ->getUploadedFileNameForStorageUsing(fn(\Livewire\Features\SupportFileUploads\TemporaryUploadedFile $file): string => \App\Support\FileStorage::safeName($file))
                             ->downloadable()
                             ->openable()
                             ->reorderable()
