@@ -215,6 +215,7 @@ class AdministrativeActResource extends Resource
                             ->acceptedFileTypes(['application/pdf'])
                             ->maxSize(204800)
                             ->getUploadedFileNameForStorageUsing(fn(TemporaryUploadedFile $file): string => static::safeStorageName($file))
+                            ->storeFileNamesIn('attachment_names')
                             ->downloadable()
                             ->openable()
                             ->reorderable()
@@ -266,6 +267,7 @@ class AdministrativeActResource extends Resource
                             ->acceptedFileTypes(['application/pdf'])
                             ->maxSize(204800)
                             ->getUploadedFileNameForStorageUsing(fn(TemporaryUploadedFile $file): string => static::safeStorageName($file))
+                            ->storeFileNamesIn('confidential_attachment_names')
                             ->downloadable()
                             ->openable()
                             ->reorderable(),
@@ -523,6 +525,8 @@ class AdministrativeActResource extends Resource
                             'confidential'      => $confidential,
                             'confidentialCount' => !$canSeeConfidential ? $confidentialCount : 0,
                             'isAdmin'           => !$canSeeConfidential,
+                            'attachmentNames'   => $record->attachment_names ?? [],
+                            'confidentialNames' => $record->confidential_attachment_names ?? [],
                         ]);
                     })
                     ->modalSubmitAction(false)
@@ -565,6 +569,7 @@ class AdministrativeActResource extends Resource
                             ->acceptedFileTypes(['application/pdf'])
                             ->maxSize(204800)
                             ->getUploadedFileNameForStorageUsing(fn(TemporaryUploadedFile $file): string => static::safeStorageName($file))
+                            ->storeFileNamesIn('regular_file_names')
                             ->hidden(fn(Get $get) => $get('is_confidential') && !auth()->user()?->hasRole('supervisor'))
                             ->required(fn(Get $get) => !$get('is_confidential') || auth()->user()?->hasRole('supervisor')),
 
@@ -575,6 +580,7 @@ class AdministrativeActResource extends Resource
                             ->acceptedFileTypes(['application/pdf'])
                             ->maxSize(204800)
                             ->getUploadedFileNameForStorageUsing(fn(TemporaryUploadedFile $file): string => static::safeStorageName($file))
+                            ->storeFileNamesIn('confidential_file_names')
                             ->hidden(fn(Get $get) => !$get('is_confidential') || auth()->user()?->hasRole('supervisor'))
                             ->required(fn(Get $get) => $get('is_confidential') && !auth()->user()?->hasRole('supervisor')),
 
@@ -592,8 +598,9 @@ class AdministrativeActResource extends Resource
                         if ($isConfidential) {
                             $files = array_values(array_filter($data['confidential_files'] ?? []));
                             $record->update([
-                                'confidential_attachments' => $files,
-                                'late_upload_reason'       => $data['late_upload_reason'],
+                                'confidential_attachments'      => $files,
+                                'confidential_attachment_names' => $data['confidential_file_names'] ?? [],
+                                'late_upload_reason'            => $data['late_upload_reason'],
                             ]);
                         } else {
                             $files = array_values(array_filter($data['regular_files'] ?? []));
@@ -609,6 +616,7 @@ class AdministrativeActResource extends Resource
                             }
                             $record->update([
                                 'attachments'        => $files,
+                                'attachment_names'   => $data['regular_file_names'] ?? [],
                                 'late_upload_reason' => $data['late_upload_reason'],
                                 'folios'             => $folios > 0 ? $folios : null,
                             ]);

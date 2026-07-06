@@ -23,7 +23,9 @@ class AdministrativeAct extends Model
         'filing_number',
         'subject',
         'attachments',
+        'attachment_names',
         'confidential_attachments',
+        'confidential_attachment_names',
         'late_upload_reason',
         'annulment_reason',
         'annulled_by',
@@ -38,7 +40,9 @@ class AdministrativeAct extends Model
     protected $casts = [
         'vigencia'          => 'integer',
         'attachments'                => 'array',
+        'attachment_names'           => 'array',
         'confidential_attachments'   => 'array',
+        'confidential_attachment_names' => 'array',
         'pdf_notified_days'          => 'array',
     ];
 

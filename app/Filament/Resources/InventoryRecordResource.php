@@ -317,6 +317,7 @@ class InventoryRecordResource extends Resource
                             ->acceptedFileTypes(['application/pdf'])
                             ->maxSize(20480) // 20MB
                             ->getUploadedFileNameForStorageUsing(fn(\Livewire\Features\SupportFileUploads\TemporaryUploadedFile $file): string => \App\Support\FileStorage::safeName($file))
+                            ->storeFileNamesIn('attachment_names')
                             ->downloadable()
                             ->openable()
                             ->reorderable()
@@ -450,7 +451,8 @@ class InventoryRecordResource extends Resource
                                     return view('filament.components.no-attachments');
                                 }
                                 return view('filament.components.attachments-list', [
-                                    'attachments' => $attachments,
+                                    'attachments'     => $attachments,
+                                    'attachmentNames' => $record->attachment_names ?? [],
                                 ]);
                             })
                             ->modalSubmitAction(false)

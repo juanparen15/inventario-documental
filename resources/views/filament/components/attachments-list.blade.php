@@ -1,3 +1,7 @@
+@php
+    $attachmentNames   = $attachmentNames ?? [];
+    $confidentialNames = $confidentialNames ?? [];
+@endphp
 <div x-data="{ pdfUrl: null, pdfName: '' }">
 
     {{-- =========================================================== --}}
@@ -26,7 +30,7 @@
 
             <a
                 :href="pdfUrl"
-                download
+                :download="pdfName"
                 class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-200 hover:bg-gray-300 dark:text-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition shrink-0"
             >
                 <x-heroicon-o-arrow-down-tray class="w-4 h-4" />
@@ -54,8 +58,9 @@
             </p>
             @foreach($attachments as $attachment)
                 @php
-                    $filename = is_string($attachment) ? basename($attachment) : ($attachment['name'] ?? 'archivo.pdf');
-                    $url = asset('storage/' . $attachment);
+                    $stored = is_string($attachment) ? $attachment : ($attachment['name'] ?? '');
+                    $filename = ($attachmentNames[$stored] ?? null) ?: basename($stored);
+                    $url = asset('storage/' . $stored);
                 @endphp
                 <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg gap-3">
                     <div class="flex items-center gap-2 min-w-0">
@@ -65,7 +70,7 @@
                     <div class="flex gap-2 shrink-0">
                         <button
                             type="button"
-                            @click="pdfUrl = '{{ $url }}'; pdfName = '{{ $filename }}'"
+                            @click="pdfUrl = '{{ addslashes($url) }}'; pdfName = '{{ addslashes($filename) }}'"
                             class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition"
                         >
                             <x-heroicon-o-eye class="w-4 h-4" />
@@ -73,7 +78,7 @@
                         </button>
                         <a
                             href="{{ $url }}"
-                            download
+                            download="{{ $filename }}"
                             class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-200 hover:bg-gray-300 dark:text-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition"
                         >
                             <x-heroicon-o-arrow-down-tray class="w-4 h-4" />
@@ -92,8 +97,9 @@
             </p>
             @foreach($confidential as $attachment)
                 @php
-                    $filename = is_string($attachment) ? basename($attachment) : ($attachment['name'] ?? 'archivo.pdf');
-                    $url = asset('storage/' . $attachment);
+                    $stored = is_string($attachment) ? $attachment : ($attachment['name'] ?? '');
+                    $filename = ($confidentialNames[$stored] ?? null) ?: basename($stored);
+                    $url = asset('storage/' . $stored);
                 @endphp
                 <div class="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg gap-3">
                     <div class="flex items-center gap-2 min-w-0">
@@ -103,7 +109,7 @@
                     <div class="flex gap-2 shrink-0">
                         <button
                             type="button"
-                            @click="pdfUrl = '{{ $url }}'; pdfName = '{{ $filename }}'"
+                            @click="pdfUrl = '{{ addslashes($url) }}'; pdfName = '{{ addslashes($filename) }}'"
                             class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition"
                         >
                             <x-heroicon-o-eye class="w-4 h-4" />
@@ -111,7 +117,7 @@
                         </button>
                         <a
                             href="{{ $url }}"
-                            download
+                            download="{{ $filename }}"
                             class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-200 hover:bg-gray-300 dark:text-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition"
                         >
                             <x-heroicon-o-arrow-down-tray class="w-4 h-4" />

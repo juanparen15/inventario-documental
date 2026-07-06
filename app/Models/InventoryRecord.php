@@ -35,6 +35,7 @@ class InventoryRecord extends Model
         'notes',
         'reference_code',
         'attachments',
+        'attachment_names',
         'created_by',
         'updated_by',
     ];
@@ -68,6 +69,7 @@ class InventoryRecord extends Model
         'folios' => 'string',
         'storage_unit_quantity' => 'integer',
         'attachments' => 'array',
+        'attachment_names' => 'array',
     ];
 
     protected static function boot(): void
