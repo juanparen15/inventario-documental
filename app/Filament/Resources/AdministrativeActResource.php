@@ -532,7 +532,11 @@ class AdministrativeActResource extends Resource
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Cerrar'),
 
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->visible(fn(AdministrativeAct $record) =>
+                        auth()->user()?->hasRole('super_admin') || auth()->id() == $record->created_by
+                
+                    ),
 
 
                                             // (
