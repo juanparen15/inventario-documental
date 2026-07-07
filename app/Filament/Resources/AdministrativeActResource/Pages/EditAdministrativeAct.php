@@ -25,11 +25,11 @@ class EditAdministrativeAct extends EditRecord
             return;
         }
 
-        if (! $isSuperAdmin && $this->record->created_at->diffInDays(now()) > 30) {
-            $this->redirect(
-                $this->getResource()::getUrl('view', ['record' => $this->record])
-            );
-        }
+        // if (! $isSuperAdmin && $this->record->created_at->diffInDays(now()) > 30) {
+        //     $this->redirect(
+        //         $this->getResource()::getUrl('view', ['record' => $this->record])
+        //     );
+        // }
     }
 
     protected function mutateFormDataBeforeSave(array $data): array
