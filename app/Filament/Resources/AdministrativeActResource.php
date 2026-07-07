@@ -16,7 +16,6 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class AdministrativeActResource extends Resource
@@ -533,15 +532,13 @@ class AdministrativeActResource extends Resource
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Cerrar'),
 
-                Tables\Actions\EditAction::make()
-                    ->visible(fn(AdministrativeAct $record) =>
-                        auth()->id() == $record->created_by
-                        
-                        // (
+                Tables\Actions\EditAction::make(),
+
+
+                                            // (
                         //     auth()->id() == $record->created_by &&
                         //     $record->created_at->diffInDays(now()) <= 30
                         // )
-                    ),
 
                 Tables\Actions\Action::make('uploadLate')
                     ->label('Subir PDF')
