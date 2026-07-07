@@ -535,7 +535,7 @@ class AdministrativeActResource extends Resource
 
                 Tables\Actions\EditAction::make()
                     ->visible(fn(AdministrativeAct $record) =>
-                        auth()->user()?->hasRole('super_admin') || auth()->id() == $record->created_by
+                        auth()->id() == $record->created_by
                         
                         // (
                         //     auth()->id() == $record->created_by &&
