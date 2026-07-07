@@ -16,6 +16,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class AdministrativeActResource extends Resource
@@ -536,9 +537,12 @@ class AdministrativeActResource extends Resource
                     ->visible(fn(AdministrativeAct $record) =>
                         auth()->user()?->hasRole('super_admin') ||
                         (
-                            auth()->id() == $record->created_by &&
-                            $record->created_at->diffInDays(now()) <= 30
+                            auth()->id() == $record->created_by
                         )
+                        // (
+                        //     auth()->id() == $record->created_by &&
+                        //     $record->created_at->diffInDays(now()) <= 30
+                        // )
                     ),
 
                 Tables\Actions\Action::make('uploadLate')
