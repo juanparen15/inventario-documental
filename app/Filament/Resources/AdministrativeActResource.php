@@ -537,7 +537,6 @@ class AdministrativeActResource extends Resource
                         auth()->user()?->hasRole('super_admin') ||
                         (
                             auth()->id() == $record->created_by &&
-                            $record->lacksPdf() &&
                             $record->created_at->diffInDays(now()) <= 30
                         )
                     ),

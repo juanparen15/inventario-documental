@@ -28,7 +28,10 @@ class ViewAdministrativeAct extends ViewRecord
     {
         return [
             Actions\EditAction::make()
-                ->visible(fn() => $this->record->created_at->diffInDays(now()) <= 30),
+                ->visible(fn() =>
+                    auth()->user()?->hasRole('super_admin') ||
+                    $this->record->created_at->diffInDays(now()) <= 30
+                ),
 
             Actions\Action::make('anular')
                 ->label('Anular')
