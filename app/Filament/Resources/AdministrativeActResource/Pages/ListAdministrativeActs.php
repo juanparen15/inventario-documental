@@ -23,6 +23,11 @@ class ListAdministrativeActs extends ListRecords
 
     protected function getHeaderActions(): array
     {
+        $user = auth()->user();
+        // Los usuarios no privilegiados exportan únicamente los registros que ellos crearon.
+        $restrictExportToOwn = $user && ! $user->hasAnyRole(['super_admin', 'supervisor']);
+        $ownerId = $user?->id;
+
         return [
             Action::make('tutorial')
                 ->label('¿Cómo funciona?')
@@ -124,6 +129,12 @@ class ListAdministrativeActs extends ListRecords
                 ->exports([
                     ExcelExport::make()
                         ->fromTable()
+                        ->modifyQueryUsing(function (Builder $query) use ($restrictExportToOwn, $ownerId) {
+                            if ($restrictExportToOwn) {
+                                $query->where('created_by', $ownerId);
+                            }
+                            return $query;
+                        })
                         ->withFilename(function ($livewire) {
                             $tabLabels = [
                                 'sin_pdf'    => 'sin-pdf',
