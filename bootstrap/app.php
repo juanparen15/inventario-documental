@@ -14,6 +14,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
+
+        // Acorta nombres de archivo largos antes de que Livewire genere el temporal
+        // (evita League\Flysystem\UnableToRetrieveMetadata por nombre > 255 bytes).
+        $middleware->web(append: [
+            \App\Http\Middleware\ShortenUploadedFileNames::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
