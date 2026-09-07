@@ -63,6 +63,15 @@ class UserResource extends Resource
                             ->relationship('organizationalUnit', 'name', fn (Builder $query) => $query->where('is_active', true))
                             ->searchable()
                             ->preload(),
+
+                        Forms\Components\Select::make('additionalOrganizationalUnits')
+                            ->label('Unidades Adicionales (solo visualización)')
+                            ->helperText('Unidades cuyos registros el usuario podrá ver además de su unidad principal. No afecta en qué unidad quedan sus registros nuevos.')
+                            ->relationship('additionalOrganizationalUnits', 'name', fn (Builder $query) => $query->where('is_active', true))
+                            ->multiple()
+                            ->searchable()
+                            ->preload()
+                            ->columnSpanFull(),
                     ]),
 
                 Forms\Components\Section::make('Credenciales de Acceso')
@@ -115,6 +124,12 @@ class UserResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
+
+                Tables\Columns\TextColumn::make('additionalOrganizationalUnits.name')
+                    ->label('Unidades Adicionales')
+                    ->badge()
+                    ->separator(',')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('phone')
                     ->label('Teléfono')

@@ -25,8 +25,8 @@ class LatestRecordsWidget extends BaseWidget
         $query = InventoryRecord::query()->latest()->limit(5);
 
         $user = auth()->user();
-        if ($user && !$user->hasRole('super_admin') && $user->organizational_unit_id) {
-            $query->where('organizational_unit_id', $user->organizational_unit_id);
+        if ($user && !$user->hasRole('super_admin')) {
+            $query->whereIn('organizational_unit_id', $user->visibleOrganizationalUnitIds());
         }
 
         return $table

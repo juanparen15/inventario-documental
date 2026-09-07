@@ -566,10 +566,10 @@ class InventoryRecordResource extends Resource
                 SoftDeletingScope::class,
             ]);
 
-        // Si no es super_admin, solo ver registros de su unidad organizacional
+        // Si no es super_admin, solo ver registros de sus unidades organizacionales
         $user = auth()->user();
-        if ($user && !$user->hasRole('super_admin') && $user->organizational_unit_id) {
-            $query->where('organizational_unit_id', $user->organizational_unit_id);
+        if ($user && !$user->hasRole('super_admin')) {
+            $query->whereIn('organizational_unit_id', $user->visibleOrganizationalUnitIds());
         }
 
         return $query;
@@ -583,8 +583,8 @@ class InventoryRecordResource extends Resource
     public static function getNavigationBadge(): ?string
     {
         $user = auth()->user();
-        if ($user && !$user->hasRole('super_admin') && $user->organizational_unit_id) {
-            return static::getModel()::where('organizational_unit_id', $user->organizational_unit_id)->count();
+        if ($user && !$user->hasRole('super_admin')) {
+            return static::getModel()::whereIn('organizational_unit_id', $user->visibleOrganizationalUnitIds())->count();
         }
         return static::getModel()::count();
     }

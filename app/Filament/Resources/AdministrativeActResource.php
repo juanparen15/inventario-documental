@@ -772,8 +772,9 @@ class AdministrativeActResource extends Resource
         $user = auth()->user();
 
         if ($user && ! $user->hasRole('super_admin')) {
-            if ($user->organizational_unit_id) {
-                $query->where('organizational_unit_id', $user->organizational_unit_id);
+            $unitIds = $user->visibleOrganizationalUnitIds();
+            if (! empty($unitIds)) {
+                $query->whereIn('organizational_unit_id', $unitIds);
             } else {
                 $query->whereRaw('0 = 1');
             }
@@ -791,8 +792,9 @@ class AdministrativeActResource extends Resource
     {
         $user = auth()->user();
         if ($user && !$user->hasRole('super_admin')) {
-            if ($user->organizational_unit_id) {
-                return static::getModel()::where('organizational_unit_id', $user->organizational_unit_id)->count();
+            $unitIds = $user->visibleOrganizationalUnitIds();
+            if (! empty($unitIds)) {
+                return static::getModel()::whereIn('organizational_unit_id', $unitIds)->count();
             }
             return '0';
         }

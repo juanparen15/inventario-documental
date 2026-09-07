@@ -7,6 +7,7 @@ use Filament\Models\Contracts\HasAvatar;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -62,6 +63,30 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
     public function organizationalUnit(): BelongsTo
     {
         return $this->belongsTo(OrganizationalUnit::class);
+    }
+
+    /**
+     * Unidades adicionales de solo visualización: amplían qué puede VER el
+     * usuario (listados, contadores, widgets) sin cambiar la unidad principal
+     * con la que se etiquetan sus registros nuevos.
+     */
+    public function additionalOrganizationalUnits(): BelongsToMany
+    {
+        return $this->belongsToMany(OrganizationalUnit::class, 'organizational_unit_user');
+    }
+
+    /**
+     * IDs de todas las unidades cuyos registros puede ver el usuario:
+     * su unidad principal más las unidades adicionales asignadas.
+     */
+    public function visibleOrganizationalUnitIds(): array
+    {
+        return collect([$this->organizational_unit_id])
+            ->merge($this->additionalOrganizationalUnits->pluck('id'))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function administrativeActs(): HasMany
