@@ -3,11 +3,13 @@
 namespace App\Filament\Resources\InventoryRecordResource\Pages;
 
 use App\Filament\Imports\InventoryRecordImporter;
+use App\Filament\Pages\ImportErrors;
 use App\Filament\Resources\InventoryRecordResource;
 use App\Models\InventoryRecord;
 use Filament\Actions;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
+use Filament\Notifications\Actions\Action as NotificationAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Support\Facades\Storage;
@@ -91,24 +93,31 @@ class ListInventoryRecords extends ListRecords
                     // Delete the uploaded file
                     Storage::disk('local')->delete($data['file']);
 
-                    if ($result['errors'] > 0) {
-                        $errorMessage = $this->formatImportErrors($result['details']);
+                    session()->flash('import_created', $result['created']);
+                    session()->flash('import_errors', $result['details']);
 
+                    $viewResultAction = NotificationAction::make('ver_resultado')
+                        ->label('Ver consecutivos y errores')
+                        ->url(ImportErrors::getUrl())
+                        ->button();
+
+                    if ($result['errors'] > 0) {
                         Notification::make()
                             ->title('Importación completada con errores')
-                            ->body("Importados: {$result['success']} | Con errores: {$result['errors']}")
+                            ->body("Importados: {$result['success']} | Con errores: {$result['errors']}. Consulte el detalle para ver los códigos de referencia asignados y las filas con error.")
                             ->warning()
                             ->persistent()
+                            ->actions([$viewResultAction])
+                            ->sendToDatabase(auth()->user())
                             ->send();
-
-                        // Store errors in session for modal display
-                        session()->flash('import_errors', $result['details']);
-                        session()->flash('import_error_message', $errorMessage);
                     } else {
                         Notification::make()
                             ->title('Importación exitosa')
-                            ->body("Se importaron {$result['success']} registros correctamente.")
+                            ->body("Se importaron {$result['success']} registros correctamente. Consulte el detalle para ver los códigos de referencia asignados.")
                             ->success()
+                            ->persistent()
+                            ->actions([$viewResultAction])
+                            ->sendToDatabase(auth()->user())
                             ->send();
                     }
                 }),
@@ -156,17 +165,5 @@ class ListInventoryRecords extends ListRecords
                         ]),
                 ]),
         ];
-    }
-
-    protected function formatImportErrors(array $errors): string
-    {
-        $lines = [];
-
-        foreach ($errors as $row => $rowErrors) {
-            $errorList = implode(', ', $rowErrors);
-            $lines[] = "Fila {$row}: {$errorList}";
-        }
-
-        return implode("\n", $lines);
     }
 }

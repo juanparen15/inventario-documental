@@ -21,6 +21,7 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 class AdministrativeActImporter
 {
     protected array $errors       = [];
+    protected array $created      = [];
     protected int   $successCount = 0;
     protected int   $errorCount   = 0;
 
@@ -191,7 +192,8 @@ class AdministrativeActImporter
                 $this->errorCount++;
             } else {
                 try {
-                    AdministrativeAct::create($data);
+                    $act = AdministrativeAct::create($data);
+                    $this->created[$rowNumber] = $act->filing_number;
                     $this->successCount++;
                 } catch (\Exception $e) {
                     $this->errors[$rowNumber] = ['Error al guardar: ' . $e->getMessage()];
@@ -204,6 +206,7 @@ class AdministrativeActImporter
             'success' => $this->successCount,
             'errors'  => $this->errorCount,
             'details' => $this->errors,
+            'created' => $this->created,
         ];
     }
 

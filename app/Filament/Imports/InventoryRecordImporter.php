@@ -16,6 +16,7 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 class InventoryRecordImporter
 {
     protected array $errors = [];
+    protected array $created = [];
     protected int $successCount = 0;
     protected int $errorCount = 0;
 
@@ -251,7 +252,8 @@ class InventoryRecordImporter
                 $this->errorCount++;
             } else {
                 try {
-                    InventoryRecord::create($data);
+                    $record = InventoryRecord::create($data);
+                    $this->created[$rowNumber] = $record->reference_code;
                     $this->successCount++;
                 } catch (\Exception $e) {
                     $this->errors[$rowNumber] = ['Error al guardar: ' . $e->getMessage()];
@@ -264,6 +266,7 @@ class InventoryRecordImporter
             'success' => $this->successCount,
             'errors' => $this->errorCount,
             'details' => $this->errors,
+            'created' => $this->created,
         ];
     }
 

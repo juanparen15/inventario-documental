@@ -24,7 +24,7 @@ class ShieldPagePermissionsSeeder extends Seeder
     private array $pagePermissions = [
         'page_ImportPermissionsPage' => ['super_admin'],
         'page_MonthlyReportPage'     => ['super_admin', 'supervisor'],
-        'page_ImportErrors'          => ['super_admin', 'supervisor'],
+        'page_ImportErrors'          => ['super_admin', 'supervisor', 'usuario'],
         'page_CambiarPassword'       => ['super_admin', 'supervisor', 'panel_user'],
     ];
 
