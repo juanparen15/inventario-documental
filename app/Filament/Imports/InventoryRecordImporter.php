@@ -2,24 +2,16 @@
 
 namespace App\Filament\Imports;
 
-use App\Models\DocumentaryClass;
+use App\Models\CcdEntry;
 use App\Models\DocumentarySeries;
 use App\Models\DocumentarySubseries;
-use App\Models\DocumentPurpose;
-use App\Models\DocumentType;
 use App\Models\InventoryRecord;
 use App\Models\OrganizationalUnit;
 use App\Models\PriorityLevel;
-use App\Models\ProcessType;
-use App\Models\Project;
 use App\Models\StorageMedium;
-use App\Models\ValidityStatus;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class InventoryRecordImporter
 {
@@ -27,172 +19,234 @@ class InventoryRecordImporter
     protected int $successCount = 0;
     protected int $errorCount = 0;
 
-    protected array $columnMapping = [
-        'A' => 'organizational_unit',
-        'B' => 'documentary_series',
-        'C' => 'documentary_subseries',
-        'D' => 'documentary_class',
-        'E' => 'document_type',
-        'F' => 'title',
-        'G' => 'description',
-        'H' => 'start_date',
-        'I' => 'end_date',
-        'J' => 'box',
-        'K' => 'folder',
-        'L' => 'volume',
-        'M' => 'folios',
-        'N' => 'storage_medium',
-        'O' => 'document_purpose',
-        'P' => 'process_type',
-        'Q' => 'validity_status',
-        'R' => 'priority_level',
-        'S' => 'project',
-        'T' => 'notes',
-    ];
-
+    /**
+     * Columnas del Excel (fila 1 = encabezados, datos desde la fila 2):
+     *
+     *   A = Unidad Organizacional * (Oficina Productora)
+     *   B = Objeto *                (uno de InventoryRecord::INVENTORY_PURPOSES)
+     *   C = Serie Documental *      (FUID, según ccd_entries de la unidad)
+     *   D = Subserie Documental     (obligatoria solo si la serie tiene subseries asignadas)
+     *   E = Título de la Unidad Documental
+     *   F = Descripción
+     *   G = Fecha Inicial (DD/MM/YYYY)
+     *   H = Fecha Final (DD/MM/YYYY)
+     *   I = No. Caja *
+     *   J = No. Carpeta *
+     *   K = No. Tomo/Legajo/Libro *
+     *   L = No. Folios *            (texto libre, ej: 1-200)
+     *   M = Soporte Físico/Electrónico
+     *   N = Tipo de Unidad de Almacenamiento (uno de InventoryRecord::STORAGE_UNIT_TYPES)
+     *   O = Cantidad de Unidades de Almacenamiento
+     *   P = Nivel de Prioridad
+     *   Q = Notas
+     */
     public function import(string $filePath): array
     {
         $spreadsheet = IOFactory::load($filePath);
         $worksheet = $spreadsheet->getActiveSheet();
         $rows = $worksheet->toArray();
 
-        // Remove header row
-        $header = array_shift($rows);
+        // Quitar fila de encabezados
+        array_shift($rows);
 
-        // Cache lookups
+        // ── Cachés de búsqueda ────────────────────────────────────────────
         $organizationalUnits = OrganizationalUnit::where('is_active', true)->pluck('id', 'name')->toArray();
-        $documentarySeries = DocumentarySeries::where('is_active', true)->pluck('id', 'name')->toArray();
-        $documentarySubseries = DocumentarySubseries::where('is_active', true)->get()->keyBy('name');
-        $documentaryClasses = DocumentaryClass::where('is_active', true)->get()->keyBy('name');
-        $documentTypes = DocumentType::where('is_active', true)->get()->keyBy('name');
         $storageMediums = StorageMedium::where('is_active', true)->pluck('id', 'name')->toArray();
-        $documentPurposes = DocumentPurpose::where('is_active', true)->pluck('id', 'name')->toArray();
-        $processTypes = ProcessType::where('is_active', true)->pluck('id', 'name')->toArray();
-        $validityStatuses = ValidityStatus::where('is_active', true)->pluck('id', 'name')->toArray();
         $priorityLevels = PriorityLevel::where('is_active', true)->pluck('id', 'name')->toArray();
-        $projects = Project::where('is_active', true)->pluck('id', 'name')->toArray();
+
+        // Series/subseries FUID activas, admite 'código - nombre' o solo 'nombre'
+        $allSeries = DocumentarySeries::where('is_active', true)->where('context', 'fuid')->get(['id', 'code', 'name']);
+        $allSeriesMap = [];
+        foreach ($allSeries as $s) {
+            $allSeriesMap["{$s->code} - {$s->name}"] = $s->id;
+            $allSeriesMap[$s->name] = $s->id;
+        }
+
+        $allSubseries = DocumentarySubseries::where('is_active', true)->get(['id', 'code', 'name', 'documentary_series_id']);
+        $subseriesById = $allSubseries->keyBy('id');
+        $subseriesMapBySeries = [];
+        foreach ($allSubseries as $sub) {
+            $subseriesMapBySeries[$sub->documentary_series_id]["{$sub->code} - {$sub->name}"] = $sub->id;
+            $subseriesMapBySeries[$sub->documentary_series_id][$sub->name] = $sub->id;
+        }
+
+        // Series/subseries permitidas por unidad, según ccd_entries (fallback: todas las FUID activas)
+        $ccdAll = CcdEntry::with(['documentarySeries:id,code,name,is_active,context'])->get();
+        $seriesAllowedByUnit = [];
+        $unitHasSubseriesForSeries = [];
+        foreach ($ccdAll as $entry) {
+            $s = $entry->documentarySeries;
+            if (! $s || ! $s->is_active || $s->context !== 'fuid') {
+                continue;
+            }
+            $unitId = $entry->organizational_unit_id;
+            $seriesAllowedByUnit[$unitId]["{$s->code} - {$s->name}"] = $s->id;
+            $seriesAllowedByUnit[$unitId][$s->name] = $s->id;
+
+            if ($entry->documentary_subseries_id) {
+                $unitHasSubseriesForSeries[$unitId][$s->id] = true;
+            }
+        }
 
         foreach ($rows as $index => $row) {
-            $rowNumber = $index + 2; // Excel row number (1-indexed, plus header)
+            $rowNumber = $index + 2; // Fila de Excel (1-indexada, más el encabezado)
 
-            // Skip empty rows
             if (empty(array_filter($row))) {
                 continue;
             }
 
             $rowErrors = [];
             $data = [];
+            $unitId = null;
+            $seriesId = null;
 
-            // Process organizational unit (required)
+            // Columna A — Unidad Organizacional (obligatoria)
             $orgUnitName = trim($row[0] ?? '');
             if (empty($orgUnitName)) {
                 $rowErrors[] = 'Unidad Organizacional es requerida';
-            } elseif (!isset($organizationalUnits[$orgUnitName])) {
+            } elseif (! isset($organizationalUnits[$orgUnitName])) {
                 $rowErrors[] = "Unidad Organizacional '{$orgUnitName}' no existe";
             } else {
-                $data['organizational_unit_id'] = $organizationalUnits[$orgUnitName];
+                $unitId = $organizationalUnits[$orgUnitName];
+                $data['organizational_unit_id'] = $unitId;
             }
 
-            // Process documentary series (required)
-            $seriesName = trim($row[1] ?? '');
+            // Columna B — Objeto (obligatorio)
+            $purposeInput = trim($row[1] ?? '');
+            $purposeKey = $this->resolvePurposeKey($purposeInput);
+            if (empty($purposeInput)) {
+                $rowErrors[] = 'Objeto es requerido';
+            } elseif (! $purposeKey) {
+                $rowErrors[] = "Objeto '{$purposeInput}' no es válido";
+            } else {
+                $data['inventory_purpose'] = $purposeKey;
+            }
+
+            // Columna C — Serie Documental (obligatoria)
+            $seriesName = trim($row[2] ?? '');
+            $unitSeriesMap = $unitId
+                ? (! empty($seriesAllowedByUnit[$unitId]) ? $seriesAllowedByUnit[$unitId] : $allSeriesMap)
+                : [];
+
             if (empty($seriesName)) {
                 $rowErrors[] = 'Serie Documental es requerida';
-            } elseif (!isset($documentarySeries[$seriesName])) {
-                $rowErrors[] = "Serie Documental '{$seriesName}' no existe";
-            } else {
-                $data['documentary_series_id'] = $documentarySeries[$seriesName];
+            } elseif ($unitId && ! isset($unitSeriesMap[$seriesName])) {
+                $rowErrors[] = "Serie Documental '{$seriesName}' no es una serie FUID válida para la unidad";
+            } elseif ($unitId) {
+                $seriesId = $unitSeriesMap[$seriesName];
+                $data['documentary_series_id'] = $seriesId;
             }
 
-            // Process documentary subseries (optional)
-            $subseriesName = trim($row[2] ?? '');
-            if (!empty($subseriesName)) {
-                $subseries = $documentarySubseries->get($subseriesName);
-                if (!$subseries) {
-                    $rowErrors[] = "Subserie Documental '{$subseriesName}' no existe";
-                } elseif (isset($data['documentary_series_id']) && $subseries->documentary_series_id !== $data['documentary_series_id']) {
-                    $rowErrors[] = "Subserie '{$subseriesName}' no pertenece a la serie seleccionada";
+            // Columna D — Subserie Documental (obligatoria solo si la serie tiene subseries asignadas)
+            $subseriesName = trim($row[3] ?? '');
+            $seriesSubMap = $seriesId ? ($subseriesMapBySeries[$seriesId] ?? []) : [];
+            $subseriesRequired = $unitId && $seriesId && ! empty($unitHasSubseriesForSeries[$unitId][$seriesId]);
+
+            if ($subseriesRequired && empty($subseriesName)) {
+                $rowErrors[] = 'Subserie Documental es requerida para la serie seleccionada';
+            } elseif (! empty($subseriesName)) {
+                if (! isset($seriesSubMap[$subseriesName])) {
+                    $rowErrors[] = "Subserie Documental '{$subseriesName}' no pertenece a la serie seleccionada";
                 } else {
-                    $data['documentary_subseries_id'] = $subseries->id;
+                    $data['documentary_subseries_id'] = $seriesSubMap[$subseriesName];
                 }
             }
 
-            // Process documentary class (optional)
-            $className = trim($row[3] ?? '');
-            if (!empty($className)) {
-                $class = $documentaryClasses->get($className);
-                if (!$class) {
-                    $rowErrors[] = "Clase Documental '{$className}' no existe";
-                } elseif (isset($data['documentary_subseries_id']) && $class->documentary_subseries_id !== $data['documentary_subseries_id']) {
-                    $rowErrors[] = "Clase '{$className}' no pertenece a la subserie seleccionada";
-                } else {
-                    $data['documentary_class_id'] = $class->id;
-                }
-            }
+            // Columna E — Título (opcional)
+            $data['title'] = trim($row[4] ?? '') ?: '';
 
-            // Process document type (optional)
-            $typeName = trim($row[4] ?? '');
-            if (!empty($typeName)) {
-                $type = $documentTypes->get($typeName);
-                if (!$type) {
-                    $rowErrors[] = "Tipo de Documento '{$typeName}' no existe";
-                } elseif (isset($data['documentary_class_id']) && $type->documentary_class_id !== $data['documentary_class_id']) {
-                    $rowErrors[] = "Tipo '{$typeName}' no pertenece a la clase seleccionada";
-                } else {
-                    $data['document_type_id'] = $type->id;
-                }
-            }
+            // Columna F — Descripción (opcional)
+            $data['description'] = trim($row[5] ?? '') ?: null;
 
-            // Process title (required)
-            $title = trim($row[5] ?? '');
-            if (empty($title)) {
-                $rowErrors[] = 'Título es requerido';
-            } else {
-                $data['title'] = $title;
-            }
-
-            // Process description (optional)
-            $data['description'] = trim($row[6] ?? '') ?: null;
-
-            // Process dates
-            $startDate = $this->parseDate($row[7] ?? '');
-            $endDate = $this->parseDate($row[8] ?? '');
+            // Columnas G/H — Fechas extremas (opcionales, "S.F." si se omiten)
+            $startDate = $this->parseDate($row[6] ?? '');
+            $endDate = $this->parseDate($row[7] ?? '');
 
             if ($startDate && $endDate && $startDate > $endDate) {
                 $rowErrors[] = 'La fecha inicial no puede ser mayor que la fecha final';
             }
 
+            $data['has_start_date'] = (bool) $startDate;
             $data['start_date'] = $startDate;
+            $data['has_end_date'] = (bool) $endDate;
             $data['end_date'] = $endDate;
 
-            // Process physical location
-            $data['box'] = trim($row[9] ?? '') ?: null;
-            $data['folder'] = trim($row[10] ?? '') ?: null;
-            $data['volume'] = trim($row[11] ?? '') ?: null;
+            // Columnas I/J/K/L — Ubicación física (obligatorias)
+            $box = trim($row[8] ?? '');
+            if (empty($box)) {
+                $rowErrors[] = 'No. Caja es requerido';
+            } else {
+                $data['box'] = $box;
+            }
 
-            $folios = trim($row[12] ?? '');
-            if (!empty($folios)) {
-                if (!is_numeric($folios) || $folios < 0) {
-                    $rowErrors[] = 'Folios debe ser un número positivo';
+            $folder = trim($row[9] ?? '');
+            if (empty($folder)) {
+                $rowErrors[] = 'No. Carpeta es requerido';
+            } else {
+                $data['folder'] = $folder;
+            }
+
+            $volume = trim($row[10] ?? '');
+            if (empty($volume)) {
+                $rowErrors[] = 'No. Tomo/Legajo/Libro es requerido';
+            } else {
+                $data['volume'] = $volume;
+            }
+
+            $folios = trim($row[11] ?? '');
+            if (empty($folios)) {
+                $rowErrors[] = 'No. Folios es requerido';
+            } else {
+                $data['folios'] = $folios;
+            }
+
+            // Columna M — Soporte (opcional)
+            $storageMediumName = trim($row[12] ?? '');
+            if (! empty($storageMediumName)) {
+                if (! isset($storageMediums[$storageMediumName])) {
+                    $rowErrors[] = "Soporte '{$storageMediumName}' no existe";
                 } else {
-                    $data['folios'] = (int) $folios;
+                    $data['storage_medium_id'] = $storageMediums[$storageMediumName];
                 }
             }
 
-            // Process catalog references
-            $this->processCatalogField($row[13] ?? '', 'Soporte', $storageMediums, 'storage_medium_id', $data, $rowErrors);
-            $this->processCatalogField($row[14] ?? '', 'Objeto', $documentPurposes, 'document_purpose_id', $data, $rowErrors);
-            $this->processCatalogField($row[15] ?? '', 'Tipo de Proceso', $processTypes, 'process_type_id', $data, $rowErrors);
-            $this->processCatalogField($row[16] ?? '', 'Estado de Vigencia', $validityStatuses, 'validity_status_id', $data, $rowErrors);
-            $this->processCatalogField($row[17] ?? '', 'Nivel de Prioridad', $priorityLevels, 'priority_level_id', $data, $rowErrors);
-            $this->processCatalogField($row[18] ?? '', 'Proyecto', $projects, 'project_id', $data, $rowErrors);
+            // Columna N — Tipo de Unidad de Almacenamiento (opcional)
+            $storageUnitTypeInput = trim($row[13] ?? '');
+            if (! empty($storageUnitTypeInput)) {
+                $storageUnitTypeKey = $this->resolveStorageUnitTypeKey($storageUnitTypeInput);
+                if (! $storageUnitTypeKey) {
+                    $rowErrors[] = "Tipo de Unidad de Almacenamiento '{$storageUnitTypeInput}' no es válido";
+                } else {
+                    $data['storage_unit_type'] = $storageUnitTypeKey;
+                }
+            }
 
-            // Process notes
-            $data['notes'] = trim($row[19] ?? '') ?: null;
+            // Columna O — Cantidad de Unidades (opcional)
+            $storageUnitQuantity = trim($row[14] ?? '');
+            if (! empty($storageUnitQuantity)) {
+                if (! is_numeric($storageUnitQuantity) || $storageUnitQuantity < 1) {
+                    $rowErrors[] = 'Cantidad de Unidades debe ser un número positivo';
+                } else {
+                    $data['storage_unit_quantity'] = (int) $storageUnitQuantity;
+                }
+            }
 
-            // Add created_by
+            // Columna P — Nivel de Prioridad (opcional)
+            $priorityLevelName = trim($row[15] ?? '');
+            if (! empty($priorityLevelName)) {
+                if (! isset($priorityLevels[$priorityLevelName])) {
+                    $rowErrors[] = "Nivel de Prioridad '{$priorityLevelName}' no existe";
+                } else {
+                    $data['priority_level_id'] = $priorityLevels[$priorityLevelName];
+                }
+            }
+
+            // Columna Q — Notas (opcional)
+            $data['notes'] = trim($row[16] ?? '') ?: null;
+
             $data['created_by'] = Auth::id();
 
-            if (!empty($rowErrors)) {
+            if (! empty($rowErrors)) {
                 $this->errors[$rowNumber] = $rowErrors;
                 $this->errorCount++;
             } else {
@@ -213,16 +267,26 @@ class InventoryRecordImporter
         ];
     }
 
-    protected function processCatalogField(?string $value, string $label, array $lookup, string $field, array &$data, array &$errors): void
+    protected function resolvePurposeKey(string $value): ?string
     {
-        $value = trim($value ?? '');
-        if (!empty($value)) {
-            if (!isset($lookup[$value])) {
-                $errors[] = "{$label} '{$value}' no existe";
-            } else {
-                $data[$field] = $lookup[$value];
-            }
+        if (isset(InventoryRecord::INVENTORY_PURPOSES[$value])) {
+            return $value;
         }
+
+        $key = array_search($value, InventoryRecord::INVENTORY_PURPOSES, true);
+
+        return $key !== false ? $key : null;
+    }
+
+    protected function resolveStorageUnitTypeKey(string $value): ?string
+    {
+        if (isset(InventoryRecord::STORAGE_UNIT_TYPES[$value])) {
+            return $value;
+        }
+
+        $key = array_search($value, InventoryRecord::STORAGE_UNIT_TYPES, true);
+
+        return $key !== false ? $key : null;
     }
 
     protected function parseDate(?string $value): ?string
@@ -233,7 +297,6 @@ class InventoryRecordImporter
 
         $value = trim($value);
 
-        // Try different date formats
         $formats = ['Y-m-d', 'd/m/Y', 'd-m-Y', 'm/d/Y', 'Y/m/d'];
 
         foreach ($formats as $format) {
@@ -243,13 +306,12 @@ class InventoryRecordImporter
             }
         }
 
-        // Try Excel serial date
         if (is_numeric($value)) {
             try {
                 $date = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float) $value);
                 return $date->format('Y-m-d');
             } catch (\Exception $e) {
-                // Ignore
+                // Ignorar: no es una fecha serial de Excel válida
             }
         }
 
@@ -262,60 +324,49 @@ class InventoryRecordImporter
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Registros de Inventario');
 
-        // Headers
         $headers = [
             'A1' => 'Unidad Organizacional *',
-            'B1' => 'Serie Documental *',
-            'C1' => 'Subserie Documental',
-            'D1' => 'Clase Documental',
-            'E1' => 'Tipo de Documento',
-            'F1' => 'Título *',
-            'G1' => 'Descripción',
-            'H1' => 'Fecha Inicial (DD/MM/YYYY)',
-            'I1' => 'Fecha Final (DD/MM/YYYY)',
-            'J1' => 'Caja',
-            'K1' => 'Carpeta',
-            'L1' => 'Tomo',
-            'M1' => 'Folios',
-            'N1' => 'Soporte',
-            'O1' => 'Objeto',
-            'P1' => 'Tipo de Proceso',
-            'Q1' => 'Estado de Vigencia',
-            'R1' => 'Nivel de Prioridad',
-            'S1' => 'Proyecto',
-            'T1' => 'Notas',
+            'B1' => 'Objeto *',
+            'C1' => 'Serie Documental *',
+            'D1' => 'Subserie Documental',
+            'E1' => 'Título',
+            'F1' => 'Descripción',
+            'G1' => 'Fecha Inicial (DD/MM/YYYY)',
+            'H1' => 'Fecha Final (DD/MM/YYYY)',
+            'I1' => 'No. Caja *',
+            'J1' => 'No. Carpeta *',
+            'K1' => 'No. Tomo/Legajo/Libro *',
+            'L1' => 'No. Folios *',
+            'M1' => 'Soporte',
+            'N1' => 'Tipo Unidad de Almacenamiento',
+            'O1' => 'Cantidad Unidades',
+            'P1' => 'Nivel de Prioridad',
+            'Q1' => 'Notas',
         ];
 
         foreach ($headers as $cell => $value) {
             $sheet->setCellValue($cell, $value);
         }
 
-        // Style headers
         $headerStyle = [
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '4F46E5']],
             'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]],
         ];
-        $sheet->getStyle('A1:T1')->applyFromArray($headerStyle);
+        $sheet->getStyle('A1:Q1')->applyFromArray($headerStyle);
 
-        // Set column widths
-        $widths = ['A' => 25, 'B' => 20, 'C' => 20, 'D' => 20, 'E' => 20, 'F' => 40, 'G' => 40, 'H' => 18, 'I' => 18, 'J' => 10, 'K' => 10, 'L' => 10, 'M' => 10, 'N' => 15, 'O' => 15, 'P' => 15, 'Q' => 15, 'R' => 15, 'S' => 20, 'T' => 30];
+        $widths = ['A' => 30, 'B' => 25, 'C' => 25, 'D' => 25, 'E' => 35, 'F' => 35, 'G' => 18, 'H' => 18, 'I' => 10, 'J' => 10, 'K' => 10, 'L' => 15, 'M' => 20, 'N' => 22, 'O' => 15, 'P' => 18, 'Q' => 30];
         foreach ($widths as $col => $width) {
             $sheet->getColumnDimension($col)->setWidth($width);
         }
 
-        // Add catalog data sheets
         self::addCatalogSheet($spreadsheet, 'Unidades', OrganizationalUnit::where('is_active', true)->pluck('name')->toArray());
-        self::addCatalogSheet($spreadsheet, 'Series', DocumentarySeries::where('is_active', true)->pluck('name')->toArray());
-        self::addCatalogSheet($spreadsheet, 'Subseries', DocumentarySubseries::where('is_active', true)->pluck('name')->toArray());
-        self::addCatalogSheet($spreadsheet, 'Clases', DocumentaryClass::where('is_active', true)->pluck('name')->toArray());
-        self::addCatalogSheet($spreadsheet, 'Tipos Doc', DocumentType::where('is_active', true)->pluck('name')->toArray());
+        self::addCatalogSheet($spreadsheet, 'Objetos', array_values(InventoryRecord::INVENTORY_PURPOSES));
+        self::addCatalogSheet($spreadsheet, 'Series FUID', DocumentarySeries::where('is_active', true)->where('context', 'fuid')->orderBy('code')->get()->map(fn ($s) => "{$s->code} - {$s->name}")->toArray());
+        self::addCatalogSheet($spreadsheet, 'Subseries', DocumentarySubseries::where('is_active', true)->orderBy('code')->get()->map(fn ($s) => "{$s->code} - {$s->name}")->toArray());
         self::addCatalogSheet($spreadsheet, 'Soportes', StorageMedium::where('is_active', true)->pluck('name')->toArray());
-        self::addCatalogSheet($spreadsheet, 'Objetos', DocumentPurpose::where('is_active', true)->pluck('name')->toArray());
-        self::addCatalogSheet($spreadsheet, 'Tipos Proceso', ProcessType::where('is_active', true)->pluck('name')->toArray());
-        self::addCatalogSheet($spreadsheet, 'Estados Vigencia', ValidityStatus::where('is_active', true)->pluck('name')->toArray());
+        self::addCatalogSheet($spreadsheet, 'Tipos Unidad Almacenamiento', array_values(InventoryRecord::STORAGE_UNIT_TYPES));
         self::addCatalogSheet($spreadsheet, 'Niveles Prioridad', PriorityLevel::where('is_active', true)->pluck('name')->toArray());
-        self::addCatalogSheet($spreadsheet, 'Proyectos', Project::where('is_active', true)->pluck('name')->toArray());
 
         $spreadsheet->setActiveSheetIndex(0);
 
