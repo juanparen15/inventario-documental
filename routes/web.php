@@ -2,13 +2,23 @@
 
 use App\Exports\MonthlyReportExport;
 use App\Models\AdministrativeAct;
+use App\Models\InventoryRecord;
+use App\Models\OrganizationalUnit;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Maatwebsite\Excel\Facades\Excel;
 
 Route::get('/', function () {
-    return view('welcome');
+    $stats = [
+        'inventoryRecords' => InventoryRecord::count(),
+        'administrativeActs' => AdministrativeAct::count(),
+        'organizationalUnits' => OrganizationalUnit::where('is_active', true)->count(),
+        'users' => User::count(),
+    ];
+
+    return view('welcome', ['stats' => $stats]);
 });
 
 // ── Exportaciones del Informe Mensual ──────────────────────────────────────
